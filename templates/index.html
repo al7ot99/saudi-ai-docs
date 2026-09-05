@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>مُنشئ المستندات التعليمية AI</title>
+
+<style>
+*{box-sizing:border-box}
+
+body{
+    margin:0;
+    background:#f5f7fb;
+    color:#172033;
+    font-family:Arial,sans-serif;
+}
+
+header{
+    background:linear-gradient(135deg,#16224a,#3157c8);
+    color:#fff;
+    text-align:center;
+    padding:30px 15px;
+}
+
+header h1{
+    margin:0;
+    font-size:30px;
+}
+
+header p{
+    margin:10px 0 0;
+    opacity:.9;
+}
+
+.wrap{
+    max-width:1050px;
+    margin:25px auto;
+    padding:0 15px;
+}
+
+.card{
+    background:#fff;
+    border-radius:20px;
+    padding:24px;
+    box-shadow:0 10px 30px #0001;
+}
+
+.steps{
+    display:flex;
+    gap:5px;
+    overflow:auto;
+    margin-bottom:22px;
+}
+
+.st{
+    min-width:80px;
+    font-size:11px;
+    text-align:center;
+    color:#667085;
+}
+
+.st i{
+    display:block;
+    height:6px;
+    background:#e5e7eb;
+    border-radius:8px;
+    margin-bottom:5px;
+}
+
+.st.on i{
+    background:#3157c8;
+}
+
+.screen{
+    display:none;
+}
+
+.screen.active{
+    display:block;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(175px,1fr));
+    gap:11px;
+}
+
+.choice{
+    padding:16px;
+    border:2px solid #e0e5ee;
+    border-radius:14px;
+    text-align:center;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.choice:hover,
+.sel{
+    border-color:#3157c8;
+    background:#eef3ff;
+}
+
+.actions{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-top:22px;
+}
+
+.btn{
+    border:0;
+    border-radius:11px;
+    padding:12px 19px;
+    cursor:pointer;
+    font-family:Arial;
+}
+
+.primary{
+    background:#3157c8;
+    color:#fff;
+}
+
+.secondary{
+    background:#edf0f5;
+}
+
+.danger{
+    background:#fff0f0;
+    color:#b42318;
+}
+
+.lessons{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:8px;
+}
+
+.lesson{
+    border:1px solid #ddd;
+    padding:12px;
+    border-radius:11px;
+    cursor:pointer;
+}
+
+.lesson:hover{
+    background:#f8faff;
+}
+
+.lesson input{
+    width:auto;
+}
+
+.badge{
+    display:inline-block;
+    background:#eef3ff;
+    color:#3157c8;
+    padding:6px 10px;
+    border-radius:20px;
+    margin:3px;
+}
+
+input,
+select{
+    width:100%;
+    padding:10px;
+    border:1px solid #d8dee9;
+    border-radius:9px;
+    margin-top:5px;
+}
+
+label{
+    font-weight:bold;
+    margin:10px 0;
+    display:block;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+td,
+th{
+    padding:10px;
+    border-bottom:1px solid #eee;
+    text-align:right;
+}
+
+.preview{
+    border:1px solid #ddd;
+    border-radius:14px;
+    padding:22px;
+}
+
+.q{
+    padding:14px 0;
+    border-bottom:1px dashed #ddd;
+}
+
+.tiny{
+    padding:7px 10px;
+    font-size:12px;
+}
+
+.status{
+    padding:12px;
+    border-radius:10px;
+    background:#effdf4;
+    color:#166534;
+    margin:12px 0;
+}
+
+.spinner{
+    width:45px;
+    height:45px;
+    border:4px solid #ddd;
+    border-top-color:#3157c8;
+    border-radius:50%;
+    animation:s 1s linear infinite;
+    margin:30px auto;
+}
+
+@keyframes s{
+    to{transform:rotate(360deg)}
+}
+
+@media(max-width:600px){
+    header h1{
+        font-size:22px;
+    }
+
+    .card{
+        padding:15px;
+    }
+
+    .actions{
+        flex-direction:column;
+    }
+
+    .actions .btn{
+        width:100%;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>📚 مُنشئ المستندات التعليمية بالذكاء الاصطناعي</h1>
+    <p>المناهج السعودية — العام الدراسي 1448–1449هـ</p>
+</header>
+
+<div class="wrap">
+
+<div class="card">
+
+<div id="steps" class="steps"></div>
+
+<div id="screens"></div>
+
+<div class="actions">
+    <button id="back" class="btn secondary">رجوع</button>
+    <button id="next" class="btn primary">التالي</button>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const D={{data|tojson}};
+
+let step=1;
+
+let S={
+    stage:'',
+    grade:'',
+    subject:'',
+    term:'',
+    unit:'',
+    lessons:[],
+    type:''
+};
+
+let questions=[];
+
+let approved=false;
+
+const N=[
+    'المرحلة',
+    'الصف',
+    'المادة',
+    'الفصل',
+    'الوحدة',
+    'الدروس',
+    'نوع المستند',
+    'المواصفات',
+    'المراجعة',
+    'التوليد',
+    'المعاينة',
+    'التصدير'
+];
+
+const esc=x=>String(x??'').replace(
+    /[&<>"]/g,
+    m=>({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;'
+    }[m])
+);
+
+function bar(){
+
+    steps.innerHTML=N.map((n,i)=>`
+
+        <div class="st ${i<step?'on':''}">
+
+            <i></i>
+
+            ${n}
+
+        </div>
+
+    `).join('');
+
+}
+
+function choices(a,k){
+
+    return `
+
+        <div class="grid">
+
+            ${a.map(x=>`
+
+                <div
+                    class="choice ${S[k]===x?'sel':''}"
+                    data-v="${esc(x)}"
+                    onclick="pick('${k}',this.dataset.v)"
+                >
+
+                    ${esc(x)}
+
+                </div>
+
+            `).join('')}
+
+        </div>
+
+    `;
+
+}
+
+function render(){
+
+    let g=D.grades[S.stage]||[];
+
+    let h='';
+
+    h+=sec(
+        1,
+        'المرحلة الدراسية',
+        choices(D.stages,'stage')
+    );
+
+    h+=sec(
+        2,
+        'الصف',
+        choices(g,'grade')
+    );
+
+    h+=sec(
+        3,
+        'المادة',
+        choices(D.subjects,'subject')
+    );
+
+    h+=sec(
+        4,
+        'الفصل الدراسي',
+        choices(
+            [
+                'الفصل الدراسي الأول',
+                'الفصل الدراسي الثاني'
+            ],
+            'term'
+        )
+    );
+
+    h+=sec(
+        5,
+        'الوحدة',
+        choices(D.units,'unit')
+    );
+
+    h+=sec(
+        6,
+        'اختر الدروس',
+
+        `
+
+        <p>
+        يمكن اختيار أكثر من درس في نفس الوقت.
+        </p>
+
+        <button
+            class="btn secondary"
+            onclick="allL(1)"
+        >
+        تحديد الكل
+        </button>
+
+        <button
+            class="btn secondary"
+            onclick="allL(0)"
+        >
+        إلغاء الكل
+        </button>
+
+        <p>
+            <span class="badge">
+                ${S.lessons.length} درس
+            </span>
+        </p>
+
+        <div class="lessons">
+
+        ${D.lessons.map((x,i)=>`
+
+            <label class="lesson">
+
+                <input
+                    type="checkbox"
+                    ${S.lessons.includes(x)?'checked':''}
+                    onchange="toggleL(${i})"
+                >
+
+                ${esc(x)}
+
+            </label>
+
+        `).join('')}
+
+        </div>
+
+        `
+    );
+
+    h+=sec(
+        7,
+        'نوع المستند',
+        choices(D.types,'type')
+    );
+
+    h+=sec(
+        8,
+        'مواصفات المستند',
+
+        `
+
+        <table>
+
+        <tr>
+            <td>اختيار من متعدد</td>
+            <td>
+                <input id="mcq"
+                       type="number"
+                       min="0"
+                       value="10">
+            </td>
+        </tr>
+
+        <tr>
+            <td>صح أو خطأ</td>
+            <td>
+                <input id="tf"
+                       type="number"
+                       min="0"
+                       value="5">
+            </td>
+        </tr>
+
+        <tr>
+            <td>أكمل الفراغ</td>
+            <td>
+                <input id="fill"
+                       type="number"
+                       min="0"
+                       value="5">
+            </td>
+        </tr>
+
+        <tr>
+            <td>صل الكلمة بالمصطلح المناسب</td>
+            <td>
+                <input id="match"
+                       type="number"
+                       min="0"
+                       value="5">
+            </td>
+        </tr>
+
+        <tr>
+            <td>صل الكلمة بالصورة المناسبة</td>
+            <td>
+                <input id="imageMatch"
+                       type="number"
+                       min="0"
+                       value="0">
+            </td>
+        </tr>
+
+        </table>
+
+        <div class="grid">
+
+            <label>
+                مستوى الصعوبة
+
+                <select id="difficulty">
+
+                    <option>سهل</option>
+
+                    <option selected>
+                        متوسط
+                    </option>
+
+                    <option>
+                        متقدم
+                    </option>
+
+                    <option>
+                        متدرج
+                    </option>
+
+                </select>
+
+            </label>
+
+            <label>
+                نموذج الإجابة
+
+                <select id="answers">
+
+                    <option>نعم</option>
+
+                    <option>لا</option>
+
+                </select>
+
+            </label>
+
+            <label>
+                اسم المعلم
+
+                <input id="teacher">
+            </label>
+
+            <label>
+                اسم المدرسة
+
+                <input id="school">
+            </label>
+
+        </div>
+
+        `
+    );
+
+    h+=sec(
+        9,
+        'مراجعة الطلب',
+
+        `
+
+        <div id="summary"></div>
+
+        <div class="status">
+
+            لن يتم تصدير أي ملف قبل
+            معاينة المحتوى واعتماده.
+
+        </div>
+
+        `
+    );
+
+    h+=sec(
+        10,
+        'التوليد',
+
+        `
+
+        <div class="spinner"></div>
+
+        <p style="text-align:center">
+
+            جاري إنشاء المحتوى...
+
+        </p>
+
+        `
+    );
+
+    h+=sec(
+        11,
+        'معاينة المحتوى',
+
+        `
+
+        <div
+            id="preview"
+            class="preview"
+        ></div>
+
+        <div class="actions">
+
+            <button
+                class="btn secondary"
+                onclick="generate()"
+            >
+                🔄 إعادة توليد
+            </button>
+
+            <button
+                class="btn primary"
+                onclick="approve()"
+            >
+                ✅ اعتماد المحتوى
+            </button>
+
+        </div>
+
+        `
+    );
+
+    h+=sec(
+        12,
+        'التصدير النهائي',
+
+        `
+
+        <div class="grid">
+
+            <button
+                class="btn primary"
+                onclick="exportF('pdf')"
+            >
+                📄 PDF
+            </button>
+
+            <button
+                class="btn primary"
+                onclick="exportF('docx')"
+            >
+                📝 Word
+            </button>
+
+            <button
+                class="btn primary"
+                onclick="exportF('both')"
+            >
+                📦 PDF + Word
+            </button>
+
+        </div>
+
+        <div id="msg"></div>
+
+        `
+    );
+
+    screens.innerHTML=h;
+
+    document
+        .querySelectorAll('.screen')
+        .forEach(x=>
+            x.classList.toggle(
+                'active',
+                +x.dataset.n===step
+            )
+        );
+
+    bar();
+
+    if(step===9){
+
+        summary.innerHTML=
+
+            ['stage','grade','subject','term','unit','type']
+            .map(k=>
+                `<span class="badge">
+                    ${esc(S[k])}
+                </span>`
+            )
+            .join('')
+
+            +
+
+            `<p>
+                <b>الدروس:</b>
+                ${S.lessons.map(esc).join('، ')}
+            </p>`;
+
+    }
+
+    back.style.visibility=
+        step===1?'hidden':'visible';
+
+    next.textContent=
+        step===9
+        ?'إنشاء المحتوى بالذكاء الاصطناعي'
+        :step===11
+        ?'اعتماد المحتوى'
+        :'التالي';
+
+}
+
+function sec(n,t,b){
+
+    return `
+
+        <section
+            class="screen"
+            data-n="${n}"
+        >
+
+            <h2>
+                ${n}. ${t}
+            </h2>
+
+            ${b}
+
+        </section>
+
+    `;
+
+}
+
+function pick(k,v){
+
+    S[k]=v;
+
+    if(k==='stage'){
+
+        S.grade='';
+        S.subject='';
+        step=2;
+
+    }
+
+    else if(k==='grade'){
+
+        step=3;
+
+    }
+
+    else if(k==='subject'){
+
+        step=4;
+
+    }
+
+    else if(k==='term'){
+
+        step=5;
+
+    }
+
+    else if(k==='unit'){
+
+        S.lessons=[];
+        step=6;
+
+    }
+
+    else if(k==='type'){
+
+        step=8;
+
+    }
+
+    render();
+
+}
+
+function toggleL(i){
+
+    let x=D.lessons[i];
+
+    S.lessons=
+        S.lessons.includes(x)
+        ?S.lessons.filter(y=>y!==x)
+        :[...S.lessons,x];
+
+    render();
+
+}
+
+function allL(v){
+
+    S.lessons=
+        v?[...D.lessons]:[];
+
+    render();
+
+}
+
+next.onclick=()=>{
+
+    if(step<9){
+
+        if(
+            step===6 &&
+            !S.lessons.length
+        ){
+
+            return alert(
+                'اختر درسًا واحدًا على الأقل'
+            );
+
+        }
+
+        if(
+            step===7 &&
+            !S.type
+        ){
+
+            return alert(
+                'اختر نوع المستند'
+            );
+
+        }
+
+        step++;
+
+        render();
+
+    }
+
+    else if(step===9){
+
+        generate();
+
+    }
+
+    else if(step===11){
+
+        approve();
+
+    }
+
+};
+
+back.onclick=()=>{
+
+    if(step>1){
+
+        step--;
+
+        render();
+
+    }
+
+};
+
+async function generate(){
+
+    step=10;
+
+    render();
+
+    let counts={};
+
+    [
+        'mcq',
+        'tf',
+        'fill',
+        'match',
+        'imageMatch'
+    ].forEach(k=>{
+
+        counts[k]=
+            +document.getElementById(k)?.value||0;
+
+    });
+
+    try{
+
+        let r=await fetch(
+            '/api/generate',
+            {
+                method:'POST',
+                headers:{
+                    'Content-Type':
+                    'application/json'
+                },
+                body:JSON.stringify({
+                    lessons:S.lessons,
+                    counts
+                })
+            }
+        );
+
+        let j=await r.json();
+
+        questions=j.questions||[];
+
+        step=11;
+
+        render();
+
+        preview.innerHTML=
+            questions.map(q=>`
+
+                <div class="q">
+
+                    <b>
+                        ${q.n}. ${esc(q.text)}
+                    </b>
+
+                    ${
+                        (q.options||[])
+                        .map(o=>
+                            `<div>
+                                ${esc(o)}
+                            </div>`
+                        )
+                        .join('')
+                    }
+
+                    <p>
+
+                        <button
+                            class="btn secondary tiny"
+                        >
+                            ✏️ تعديل
+                        </button>
+
+                        <button
+                            class="btn secondary tiny"
+                        >
+                            🔄 إعادة توليد
+                        </button>
+
+                    </p>
+
+                </div>
+
+            `).join('');
+
+    }
+
+    catch(e){
+
+        alert(
+            'حدث خطأ أثناء إنشاء المحتوى.'
+        );
+
+        step=9;
+
+        render();
+
+    }
+
+}
+
+function approve(){
+
+    approved=true;
+
+    step=12;
+
+    render();
+
+    msg.innerHTML=
+
+        `<div class="status">
+            تم اعتماد المحتوى.
+            اختر PDF أو Word.
+        </div>`;
+
+}
+
+async function exportF(format){
+
+    if(!approved){
+
+        return;
+
+    }
+
+    let meta={
+
+        ...S,
+
+        title:
+            S.type+' — '+S.subject,
+
+        teacher:
+            document.getElementById('teacher')?.value||'',
+
+        school:
+            document.getElementById('school')?.value||''
+
+    };
+
+    try{
+
+        let r=await fetch(
+            '/api/export',
+            {
+                method:'POST',
+                headers:{
+                    'Content-Type':
+                    'application/json'
+                },
+
+                body:JSON.stringify({
+                    format,
+                    questions,
+                    meta
+                })
+
+            }
+        );
+
+        let b=await r.blob();
+
+        let u=URL.createObjectURL(b);
+
+        let a=document.createElement('a');
+
+        a.href=u;
+
+        a.download=
+            format==='both'
+            ?'المستندات.zip'
+            :format==='pdf'
+            ?'المستند.pdf'
+            :'المستند.docx';
+
+        a.click();
+
+        URL.revokeObjectURL(u);
+
+    }
+
+    catch(e){
+
+        alert(
+            'حدث خطأ أثناء تصدير الملف.'
+        );
+
+    }
+
+}
+
+render();
+
+</script>
+
+</body>
+</html>
