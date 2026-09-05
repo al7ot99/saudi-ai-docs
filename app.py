@@ -5,8 +5,8 @@ from reportlab.lib.pagesizes import A4
 from docx import Document
 from docx.shared import Pt
 app=Flask(__name__)
-DATA='data/curriculum.json'
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(BASE_DIR, "data", "curriculum.json")
 def curriculum():
     with open(DATA,encoding='utf8') as f:return json.load(f)
 
