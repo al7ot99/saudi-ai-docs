@@ -211,6 +211,350 @@ def pdf_bytes(qs, meta):
     right = w - 35
     y = h - 35
 
+    # اختيار الخط
+    if os.path.exists(FONT_PATH):
+        c.setFont("ArabicFont", 15)
+    else:
+        c.setFont("Helvetica-Bold", 15)
+
+    # العنوان
+    title = meta.get(
+        "title",
+        "مستند تعليمي"
+    )
+
+    if os.path.exists(FONT_PATH):
+        c.drawRightString(
+            right,
+            y,
+            ar(title)
+        )
+    else:
+        c.drawRightString(
+            right,
+            y,
+            title
+        )
+
+    y -= 25
+
+    # اسم الطالب
+    if os.path.exists(FONT_PATH):
+        c.setFont("ArabicFont", 11)
+
+        c.drawRightString(
+            right,
+            y,
+            ar(
+                "اسم الطالب: ______________________________"
+            )
+        )
+
+    else:
+        c.setFont("Helvetica-Bold", 11)
+
+        c.drawRightString(
+            right,
+            y,
+            "اسم الطالب: ______________________________"
+        )
+
+    y -= 22
+
+    # معلومات الورقة
+    info = []
+
+    for k in [
+        "stage",
+        "grade",
+        "subject",
+        "term",
+        "unit"
+    ]:
+
+        if meta.get(k):
+            info.append(
+                str(meta[k])
+            )
+
+    if info:
+
+        info_text = " | ".join(info)
+
+        if os.path.exists(FONT_PATH):
+
+            c.setFont(
+                "ArabicFont",
+                8.5
+            )
+
+            c.drawRightString(
+                right,
+                y,
+                ar(info_text)
+            )
+
+        else:
+
+            c.setFont(
+                "Helvetica",
+                8.5
+            )
+
+            c.drawRightString(
+                right,
+                y,
+                info_text[:120]
+            )
+
+        y -= 18
+
+    # خط فاصل
+    c.line(
+        35,
+        y,
+        w - 35,
+        y
+    )
+
+    y -= 16
+
+    # الأسئلة
+    for q in qs:
+
+        question = (
+            f"{q['n']}. "
+            f"{q['text']}"
+        )
+
+        # إذا اقتربنا من نهاية الصفحة
+        if y < 55:
+
+            c.showPage()
+
+            y = h - 40
+
+        # السؤال
+        if os.path.exists(FONT_PATH):
+
+            c.setFont(
+                "ArabicFont",
+                9
+            )
+
+            c.drawRightString(
+                right,
+                y,
+                ar(question)
+            )
+
+        else:
+
+            c.setFont(
+                "Helvetica",
+                9
+            )
+
+            c.drawRightString(
+                right,
+                y,
+                question[:125]
+            )
+
+        y -= 13
+
+        # اختيار من متعدد
+        if q.get("type") == "اختيار من متعدد":
+
+            options = q.get(
+                "options",
+                []
+            )
+
+            # إضافة علامة اختيار أمام كل خيار
+            options_line = "     ".join(
+                [
+                    "☐ " + str(x)
+                    for x in options
+                ]
+            )
+
+            if os.path.exists(FONT_PATH):
+
+                c.setFont(
+                    "ArabicFont",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    ar(options_line)
+                )
+
+            else:
+
+                c.setFont(
+                    "Helvetica",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    options_line[:125]
+                )
+
+            y -= 13
+
+        # صح أو خطأ
+        elif q.get("type") == "صح أو خطأ":
+
+            tf = "☐ صح       ☐ خطأ"
+
+            if os.path.exists(FONT_PATH):
+
+                c.setFont(
+                    "ArabicFont",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    ar(tf)
+                )
+
+            else:
+
+                c.setFont(
+                    "Helvetica",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    tf
+                )
+
+            y -= 13
+
+        # أكمل الفراغ
+        elif q.get("type") == "أكمل الفراغ":
+
+            line = "________________________________________"
+
+            if os.path.exists(FONT_PATH):
+
+                c.setFont(
+                    "ArabicFont",
+                    8
+                )
+
+            else:
+
+                c.setFont(
+                    "Helvetica",
+                    8
+                )
+
+            c.drawRightString(
+                right,
+                y,
+                line
+            )
+
+            y -= 13
+
+        # توصيل
+        elif q.get("type") == "صل الكلمة بالمصطلح المناسب":
+
+            match_text = (
+                "(1) __________     (أ) __________     "
+                "(2) __________     (ب) __________"
+            )
+
+            if os.path.exists(FONT_PATH):
+
+                c.setFont(
+                    "ArabicFont",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    ar(match_text)
+                )
+
+            else:
+
+                c.setFont(
+                    "Helvetica",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    match_text
+                )
+
+            y -= 13
+
+        # توصيل بالصورة
+        else:
+
+            image_text = (
+                "☐ صورة 1       "
+                "☐ صورة 2       "
+                "☐ صورة 3"
+            )
+
+            if os.path.exists(FONT_PATH):
+
+                c.setFont(
+                    "ArabicFont",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    ar(image_text)
+                )
+
+            else:
+
+                c.setFont(
+                    "Helvetica",
+                    8
+                )
+
+                c.drawRightString(
+                    right,
+                    y,
+                    image_text
+                )
+
+            y -= 13
+
+        # مسافة بسيطة بين الأسئلة
+        y -= 4
+
+    c.save()
+
+    return b.getvalue()
+    b = io.BytesIO()
+
+    c = canvas.Canvas(b, pagesize=A4)
+
+    w, h = A4
+
+    right = w - 35
+    y = h - 35
+
     # العنوان
     c.setFont("Helvetica-Bold", 15)
     c.drawRightString(
