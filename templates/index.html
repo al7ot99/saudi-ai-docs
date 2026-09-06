@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
+
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -7,7 +8,10 @@
 <title>مُنشئ المستندات التعليمية AI</title>
 
 <style>
-*{box-sizing:border-box}
+
+*{
+    box-sizing:border-box;
+}
 
 body{
     margin:0;
@@ -24,13 +28,7 @@ header{
 }
 
 header h1{
-    margin:0;
-    font-size:30px;
-}
-
-header p{
-    margin:10px 0 0;
-    opacity:.9;
+    margin:0 0 8px;
 }
 
 .wrap{
@@ -92,7 +90,6 @@ header p{
     border-radius:14px;
     text-align:center;
     cursor:pointer;
-    transition:.2s;
 }
 
 .choice:hover,
@@ -113,7 +110,6 @@ header p{
     border-radius:11px;
     padding:12px 19px;
     cursor:pointer;
-    font-family:Arial;
 }
 
 .primary{
@@ -140,11 +136,6 @@ header p{
     border:1px solid #ddd;
     padding:12px;
     border-radius:11px;
-    cursor:pointer;
-}
-
-.lesson:hover{
-    background:#f8faff;
 }
 
 .lesson input{
@@ -188,18 +179,98 @@ th{
 }
 
 .preview{
-    border:1px solid #ddd;
-    border-radius:14px;
-    padding:22px;
+    background:#fff;
+    border:1px solid #d8dee9;
+    border-radius:8px;
+    padding:35px;
+    margin-top:15px;
+}
+
+/* ورقة الاختبار */
+
+.paper{
+    background:#fff;
+    max-width:850px;
+    margin:auto;
+    color:#111;
+    line-height:1.7;
+}
+
+.paper-header{
+    text-align:center;
+    border-bottom:2px solid #222;
+    padding-bottom:12px;
+    margin-bottom:15px;
+}
+
+.paper-title{
+    font-size:21px;
+    font-weight:bold;
+    margin-bottom:12px;
+}
+
+.student-line{
+    text-align:right;
+    font-size:15px;
+    font-weight:bold;
+    margin:10px 0;
+}
+
+.student-name{
+    display:inline-block;
+    min-width:330px;
+    border-bottom:1px solid #222;
+    height:24px;
+}
+
+.paper-info{
+    font-size:12px;
+    text-align:center;
+    margin-top:8px;
 }
 
 .q{
-    padding:14px 0;
-    border-bottom:1px dashed #ddd;
+    padding:7px 0;
+    margin-bottom:3px;
+    border-bottom:1px dotted #bbb;
+    page-break-inside:avoid;
 }
 
-.tiny{
-    padding:7px 10px;
+.q-text{
+    font-weight:bold;
+    font-size:13px;
+    margin-bottom:3px;
+}
+
+.options-row{
+    display:flex;
+    flex-wrap:nowrap;
+    gap:18px;
+    font-size:12px;
+    white-space:nowrap;
+    direction:rtl;
+}
+
+.option{
+    display:inline-block;
+}
+
+.answer-line{
+    display:inline-block;
+    min-width:260px;
+    border-bottom:1px dotted #555;
+}
+
+.match-row{
+    display:flex;
+    gap:35px;
+    font-size:12px;
+    margin-top:3px;
+}
+
+.image-row{
+    display:flex;
+    gap:25px;
     font-size:12px;
 }
 
@@ -221,36 +292,92 @@ th{
     margin:30px auto;
 }
 
-@keyframes s{
-    to{transform:rotate(360deg)}
+.tiny{
+    padding:7px 10px;
+    font-size:12px;
 }
 
-@media(max-width:600px){
-    header h1{
-        font-size:22px;
+@keyframes s{
+    to{
+        transform:rotate(360deg);
     }
+}
 
-    .card{
+/* الجوال */
+
+@media(max-width:650px){
+
+    .preview{
         padding:15px;
     }
 
-    .actions{
-        flex-direction:column;
+    .options-row{
+        gap:8px;
+        font-size:10px;
     }
 
-    .actions .btn{
-        width:100%;
+    .paper-title{
+        font-size:17px;
     }
+
+    .student-line{
+        font-size:13px;
+    }
+
+    .student-name{
+        min-width:180px;
+    }
+
 }
+
+/* الطباعة */
+
+@media print{
+
+    body{
+        background:#fff;
+    }
+
+    header,
+    .steps,
+    .actions,
+    #steps,
+    button{
+        display:none!important;
+    }
+
+    .wrap,
+    .card,
+    .preview{
+        margin:0;
+        padding:0;
+        box-shadow:none;
+        border:0;
+        max-width:none;
+    }
+
+    .paper{
+        max-width:none;
+    }
+
+}
+
 </style>
 </head>
+
 
 <body>
 
 <header>
-    <h1>📚 مُنشئ المستندات التعليمية بالذكاء الاصطناعي</h1>
-    <p>المناهج السعودية — العام الدراسي 1448–1449هـ</p>
+
+<h1>📚 مُنشئ المستندات التعليمية بالذكاء الاصطناعي</h1>
+
+<p>
+المناهج السعودية — العام 1448–1449هـ
+</p>
+
 </header>
+
 
 <div class="wrap">
 
@@ -261,13 +388,25 @@ th{
 <div id="screens"></div>
 
 <div class="actions">
-    <button id="back" class="btn secondary">رجوع</button>
-    <button id="next" class="btn primary">التالي</button>
-</div>
+
+<button
+id="back"
+class="btn secondary">
+رجوع
+</button>
+
+<button
+id="next"
+class="btn primary">
+التالي
+</button>
 
 </div>
 
 </div>
+
+</div>
+
 
 <script>
 
@@ -289,6 +428,7 @@ let questions=[];
 
 let approved=false;
 
+
 const N=[
     'المرحلة',
     'الصف',
@@ -304,15 +444,16 @@ const N=[
     'التصدير'
 ];
 
-const esc=x=>String(x??'').replace(
-    /[&<>"]/g,
-    m=>({
-        '&':'&amp;',
-        '<':'&lt;',
-        '>':'&gt;',
-        '"':'&quot;'
-    }[m])
-);
+
+const esc=x=>
+String(x??'')
+.replace(/[&<>\"]/g,m=>({
+    '&':'&amp;',
+    '<':'&lt;',
+    '>':'&gt;',
+    '"':'&quot;'
+}[m]));
+
 
 function bar(){
 
@@ -330,31 +471,32 @@ function bar(){
 
 }
 
+
 function choices(a,k){
 
     return `
 
-        <div class="grid">
+    <div class="grid">
 
-            ${a.map(x=>`
+        ${a.map(x=>`
 
-                <div
-                    class="choice ${S[k]===x?'sel':''}"
-                    data-v="${esc(x)}"
-                    onclick="pick('${k}',this.dataset.v)"
-                >
+            <div
+            class="choice ${S[k]===x?'sel':''}"
+            data-v="${esc(x)}"
+            onclick="pick('${k}',this.dataset.v)">
 
-                    ${esc(x)}
+                ${esc(x)}
 
-                </div>
+            </div>
 
-            `).join('')}
+        `).join('')}
 
-        </div>
+    </div>
 
     `;
 
 }
+
 
 function render(){
 
@@ -362,11 +504,13 @@ function render(){
 
     let h='';
 
+
     h+=sec(
         1,
         'المرحلة الدراسية',
         choices(D.stages,'stage')
     );
+
 
     h+=sec(
         2,
@@ -374,11 +518,13 @@ function render(){
         choices(g,'grade')
     );
 
+
     h+=sec(
         3,
         'المادة',
         choices(D.subjects,'subject')
     );
+
 
     h+=sec(
         4,
@@ -392,11 +538,13 @@ function render(){
         )
     );
 
+
     h+=sec(
         5,
         'الوحدة',
         choices(D.units,'unit')
     );
+
 
     h+=sec(
         6,
@@ -409,23 +557,21 @@ function render(){
         </p>
 
         <button
-            class="btn secondary"
-            onclick="allL(1)"
-        >
+        class="btn secondary"
+        onclick="allL(1)">
         تحديد الكل
         </button>
 
         <button
-            class="btn secondary"
-            onclick="allL(0)"
-        >
+        class="btn secondary"
+        onclick="allL(0)">
         إلغاء الكل
         </button>
 
         <p>
-            <span class="badge">
-                ${S.lessons.length} درس
-            </span>
+        <span class="badge">
+        ${S.lessons.length} درس
+        </span>
         </p>
 
         <div class="lessons">
@@ -435,10 +581,9 @@ function render(){
             <label class="lesson">
 
                 <input
-                    type="checkbox"
-                    ${S.lessons.includes(x)?'checked':''}
-                    onchange="toggleL(${i})"
-                >
+                type="checkbox"
+                ${S.lessons.includes(x)?'checked':''}
+                onchange="toggleL(${i})">
 
                 ${esc(x)}
 
@@ -449,13 +594,17 @@ function render(){
         </div>
 
         `
+
     );
+
 
     h+=sec(
         7,
         'نوع المستند',
+
         choices(D.types,'type')
     );
+
 
     h+=sec(
         8,
@@ -465,112 +614,89 @@ function render(){
 
         <table>
 
-        <tr>
-            <td>اختيار من متعدد</td>
-            <td>
-                <input id="mcq"
-                       type="number"
-                       min="0"
-                       value="10">
-            </td>
-        </tr>
+        ${
+        [
+            ['mcq','اختيار من متعدد',10],
+            ['tf','صح أو خطأ',5],
+            ['fill','أكمل الفراغ',5],
+            ['match','صل الكلمة بالمصطلح المناسب',5],
+            ['imageMatch','صل الكلمة بالصورة المناسبة',0]
+        ]
 
-        <tr>
-            <td>صح أو خطأ</td>
-            <td>
-                <input id="tf"
-                       type="number"
-                       min="0"
-                       value="5">
-            </td>
-        </tr>
+        .map(a=>`
 
-        <tr>
-            <td>أكمل الفراغ</td>
-            <td>
-                <input id="fill"
-                       type="number"
-                       min="0"
-                       value="5">
-            </td>
-        </tr>
+            <tr>
 
-        <tr>
-            <td>صل الكلمة بالمصطلح المناسب</td>
-            <td>
-                <input id="match"
-                       type="number"
-                       min="0"
-                       value="5">
-            </td>
-        </tr>
+                <td>${a[1]}</td>
 
-        <tr>
-            <td>صل الكلمة بالصورة المناسبة</td>
-            <td>
-                <input id="imageMatch"
-                       type="number"
-                       min="0"
-                       value="0">
-            </td>
-        </tr>
+                <td>
+
+                    <input
+                    id="${a[0]}"
+                    type="number"
+                    min="0"
+                    value="${a[2]}">
+
+                </td>
+
+            </tr>
+
+        `).join('')}
 
         </table>
+
 
         <div class="grid">
 
             <label>
-                مستوى الصعوبة
+            الصعوبة
 
-                <select id="difficulty">
+            <select id="difficulty">
 
-                    <option>سهل</option>
+                <option>سهل</option>
+                <option selected>متوسط</option>
+                <option>متقدم</option>
+                <option>متدرج</option>
 
-                    <option selected>
-                        متوسط
-                    </option>
-
-                    <option>
-                        متقدم
-                    </option>
-
-                    <option>
-                        متدرج
-                    </option>
-
-                </select>
+            </select>
 
             </label>
 
+
             <label>
-                نموذج الإجابة
+            نموذج الإجابة
 
-                <select id="answers">
+            <select id="answers">
 
-                    <option>نعم</option>
+                <option>نعم</option>
+                <option>لا</option>
 
-                    <option>لا</option>
-
-                </select>
+            </select>
 
             </label>
 
-            <label>
-                اسم المعلم
 
-                <input id="teacher">
+            <label>
+            اسم المعلم
+
+            <input id="teacher">
+
             </label>
 
-            <label>
-                اسم المدرسة
 
-                <input id="school">
+            <label>
+            اسم المدرسة
+
+            <input id="school">
+
             </label>
 
         </div>
 
         `
+
     );
+
 
     h+=sec(
         9,
@@ -582,13 +708,15 @@ function render(){
 
         <div class="status">
 
-            لن يتم تصدير أي ملف قبل
-            معاينة المحتوى واعتماده.
+        لن يتم تصدير أي ملف قبل معاينة
+        المحتوى واعتماده.
 
         </div>
 
         `
+
     );
+
 
     h+=sec(
         10,
@@ -600,12 +728,14 @@ function render(){
 
         <p style="text-align:center">
 
-            جاري إنشاء المحتوى...
+        جاري إنشاء المحتوى...
 
         </p>
 
         `
+
     );
+
 
     h+=sec(
         11,
@@ -613,31 +743,35 @@ function render(){
 
         `
 
-        <div
-            id="preview"
-            class="preview"
-        ></div>
+        <div id="preview"
+        class="preview"></div>
+
 
         <div class="actions">
 
             <button
-                class="btn secondary"
-                onclick="generate()"
-            >
-                🔄 إعادة توليد
+            class="btn secondary"
+            onclick="generate()">
+
+            🔄 إعادة توليد
+
             </button>
 
+
             <button
-                class="btn primary"
-                onclick="approve()"
-            >
-                ✅ اعتماد المحتوى
+            class="btn primary"
+            onclick="approve()">
+
+            ✅ اعتماد المحتوى
+
             </button>
 
         </div>
 
         `
+
     );
+
 
     h+=sec(
         12,
@@ -648,69 +782,90 @@ function render(){
         <div class="grid">
 
             <button
-                class="btn primary"
-                onclick="exportF('pdf')"
-            >
-                📄 PDF
+            class="btn primary"
+            onclick="exportF('pdf')">
+
+            📄 PDF
+
             </button>
 
-            <button
-                class="btn primary"
-                onclick="exportF('docx')"
-            >
-                📝 Word
-            </button>
 
             <button
-                class="btn primary"
-                onclick="exportF('both')"
-            >
-                📦 PDF + Word
+            class="btn primary"
+            onclick="exportF('docx')">
+
+            📝 Word
+
+            </button>
+
+
+            <button
+            class="btn primary"
+            onclick="exportF('both')">
+
+            📦 PDF + Word
+
             </button>
 
         </div>
 
+
         <div id="msg"></div>
 
         `
+
     );
+
 
     screens.innerHTML=h;
 
+
     document
-        .querySelectorAll('.screen')
-        .forEach(x=>
-            x.classList.toggle(
-                'active',
-                +x.dataset.n===step
-            )
-        );
+    .querySelectorAll('.screen')
+    .forEach(x=>
+        x.classList.toggle(
+            'active',
+            +x.dataset.n===step
+        )
+    );
+
 
     bar();
+
 
     if(step===9){
 
         summary.innerHTML=
 
-            ['stage','grade','subject','term','unit','type']
-            .map(k=>
-                `<span class="badge">
-                    ${esc(S[k])}
-                </span>`
-            )
-            .join('')
+        [
+            'stage',
+            'grade',
+            'subject',
+            'term',
+            'unit',
+            'type'
+        ]
 
-            +
+        .map(k=>
+            `<span class="badge">
+            ${esc(S[k])}
+            </span>`
+        )
+        .join('')
 
-            `<p>
-                <b>الدروس:</b>
-                ${S.lessons.map(esc).join('، ')}
-            </p>`;
+        +
+
+        `<p>
+        <b>الدروس:</b>
+        ${S.lessons.map(esc).join('، ')}
+        </p>`;
 
     }
 
+
     back.style.visibility=
         step===1?'hidden':'visible';
+
 
     next.textContent=
         step===9
@@ -721,30 +876,32 @@ function render(){
 
 }
 
+
 function sec(n,t,b){
 
     return `
 
-        <section
-            class="screen"
-            data-n="${n}"
-        >
+    <section
+    class="screen"
+    data-n="${n}">
 
-            <h2>
-                ${n}. ${t}
-            </h2>
+        <h2>
+        ${n}. ${t}
+        </h2>
 
-            ${b}
+        ${b}
 
-        </section>
+    </section>
 
     `;
 
 }
 
+
 function pick(k,v){
 
     S[k]=v;
+
 
     if(k==='stage'){
 
@@ -754,23 +911,14 @@ function pick(k,v){
 
     }
 
-    else if(k==='grade'){
-
+    else if(k==='grade')
         step=3;
 
-    }
-
-    else if(k==='subject'){
-
+    else if(k==='subject')
         step=4;
 
-    }
-
-    else if(k==='term'){
-
+    else if(k==='term')
         step=5;
-
-    }
 
     else if(k==='unit'){
 
@@ -779,37 +927,44 @@ function pick(k,v){
 
     }
 
-    else if(k==='type'){
-
+    else if(k==='type')
         step=8;
 
-    }
 
     render();
 
 }
+
 
 function toggleL(i){
 
     let x=D.lessons[i];
 
+
     S.lessons=
         S.lessons.includes(x)
+
         ?S.lessons.filter(y=>y!==x)
+
         :[...S.lessons,x];
+
 
     render();
 
 }
+
 
 function allL(v){
 
     S.lessons=
-        v?[...D.lessons]:[];
+        v
+        ?[...D.lessons]
+        :[];
 
     render();
 
 }
+
 
 next.onclick=()=>{
 
@@ -818,24 +973,20 @@ next.onclick=()=>{
         if(
             step===6 &&
             !S.lessons.length
-        ){
-
+        )
             return alert(
                 'اختر درسًا واحدًا على الأقل'
             );
 
-        }
 
         if(
             step===7 &&
             !S.type
-        ){
-
+        )
             return alert(
                 'اختر نوع المستند'
             );
 
-        }
 
         step++;
 
@@ -857,6 +1008,7 @@ next.onclick=()=>{
 
 };
 
+
 back.onclick=()=>{
 
     if(step>1){
@@ -869,13 +1021,16 @@ back.onclick=()=>{
 
 };
 
+
 async function generate(){
 
     step=10;
 
     render();
 
+
     let counts={};
+
 
     [
         'mcq',
@@ -883,92 +1038,268 @@ async function generate(){
         'fill',
         'match',
         'imageMatch'
-    ].forEach(k=>{
+    ]
+
+    .forEach(k=>{
 
         counts[k]=
             +document.getElementById(k)?.value||0;
 
     });
 
-    try{
 
-        let r=await fetch(
-            '/api/generate',
-            {
-                method:'POST',
-                headers:{
-                    'Content-Type':
-                    'application/json'
-                },
-                body:JSON.stringify({
-                    lessons:S.lessons,
-                    counts
-                })
-            }
-        );
+    let r=await fetch(
+        '/api/generate',
+        {
+            method:'POST',
+            headers:{
+                'Content-Type':
+                'application/json'
+            },
 
-        let j=await r.json();
+            body:JSON.stringify({
 
-        questions=j.questions||[];
+                lessons:S.lessons,
+                counts
 
-        step=11;
+            })
 
-        render();
+        }
+    );
 
-        preview.innerHTML=
-            questions.map(q=>`
+
+    let j=await r.json();
+
+    questions=j.questions||[];
+
+
+    step=11;
+
+    render();
+
+
+    renderPreview();
+
+}
+
+
+function renderPreview(){
+
+    let previewBox=
+        document.getElementById('preview');
+
+
+    if(!previewBox)
+        return;
+
+
+    let html=`
+
+    <div class="paper">
+
+
+        <div class="paper-header">
+
+            <div class="paper-title">
+
+                ${esc(
+                    S.type ||
+                    'اختبار'
+                )}
+
+                ${
+                    S.subject
+                    ?' — '+esc(S.subject)
+                    :''
+                }
+
+            </div>
+
+
+            <div class="student-line">
+
+                اسم الطالب:
+
+                <span class="student-name"></span>
+
+            </div>
+
+
+            <div class="paper-info">
+
+                ${esc(S.stage)}
+                &nbsp; | &nbsp;
+
+                ${esc(S.grade)}
+                &nbsp; | &nbsp;
+
+                ${esc(S.term)}
+                &nbsp; | &nbsp;
+
+                ${esc(S.unit)}
+
+            </div>
+
+        </div>
+
+
+        ${
+            questions.length
+            ?questions.map(q=>{
+
+                let content='';
+
+
+                if(
+                    q.type===
+                    'اختيار من متعدد'
+                ){
+
+                    content=`
+
+                    <div class="options-row">
+
+                        ${q.options.map(o=>`
+
+                            <span class="option">
+                            ☐ ${esc(o)}
+                            </span>
+
+                        `).join('')}
+
+                    </div>
+
+                    `;
+
+                }
+
+
+                else if(
+                    q.type===
+                    'صح أو خطأ'
+                ){
+
+                    content=`
+
+                    <div class="options-row">
+
+                        <span class="option">
+                        ☐ صح
+                        </span>
+
+                        <span class="option">
+                        ☐ خطأ
+                        </span>
+
+                    </div>
+
+                    `;
+
+                }
+
+
+                else if(
+                    q.type===
+                    'أكمل الفراغ'
+                ){
+
+                    content=`
+
+                    <span class="answer-line"></span>
+
+                    `;
+
+                }
+
+
+                else if(
+                    q.type===
+                    'صل الكلمة بالمصطلح المناسب'
+                ){
+
+                    content=`
+
+                    <div class="match-row">
+
+                        <span>
+                        (1) __________
+                        </span>
+
+                        <span>
+                        (أ) __________
+                        </span>
+
+                        <span>
+                        (2) __________
+                        </span>
+
+                        <span>
+                        (ب) __________
+                        </span>
+
+                    </div>
+
+                    `;
+
+                }
+
+
+                else{
+
+                    content=`
+
+                    <div class="image-row">
+
+                        ☐ صورة 1
+                        &nbsp;&nbsp;
+
+                        ☐ صورة 2
+                        &nbsp;&nbsp;
+
+                        ☐ صورة 3
+
+                    </div>
+
+                    `;
+
+                }
+
+
+                return `
 
                 <div class="q">
 
-                    <b>
-                        ${q.n}. ${esc(q.text)}
-                    </b>
+                    <div class="q-text">
 
-                    ${
-                        (q.options||[])
-                        .map(o=>
-                            `<div>
-                                ${esc(o)}
-                            </div>`
-                        )
-                        .join('')
-                    }
+                        ${q.n}.
+                        ${esc(q.text)}
 
-                    <p>
+                    </div>
 
-                        <button
-                            class="btn secondary tiny"
-                        >
-                            ✏️ تعديل
-                        </button>
-
-                        <button
-                            class="btn secondary tiny"
-                        >
-                            🔄 إعادة توليد
-                        </button>
-
-                    </p>
+                    ${content}
 
                 </div>
 
-            `).join('');
+                `;
 
-    }
+            }).join('')
 
-    catch(e){
+            :
 
-        alert(
-            'حدث خطأ أثناء إنشاء المحتوى.'
-        );
+            '<p>لا توجد أسئلة.</p>'
 
-        step=9;
+        }
 
-        render();
 
-    }
+    </div>
+
+    `;
+
+
+    previewBox.innerHTML=html;
 
 }
+
 
 function approve(){
 
@@ -978,88 +1309,108 @@ function approve(){
 
     render();
 
-    msg.innerHTML=
 
-        `<div class="status">
-            تم اعتماد المحتوى.
-            اختر PDF أو Word.
-        </div>`;
+    msg.innerHTML=`
+
+        <div class="status">
+
+        ✅ تم اعتماد المحتوى.
+
+        اختر صيغة التصدير.
+
+        </div>
+
+    `;
 
 }
 
+
 async function exportF(format){
 
-    if(!approved){
-
+    if(!approved)
         return;
 
-    }
 
     let meta={
 
         ...S,
 
         title:
-            S.type+' — '+S.subject,
+            S.type+
+            ' — '+
+            S.subject,
 
         teacher:
-            document.getElementById('teacher')?.value||'',
+            document.getElementById(
+                'teacher'
+            )?.value||'',
 
         school:
-            document.getElementById('school')?.value||''
+            document.getElementById(
+                'school'
+            )?.value||''
 
     };
 
-    try{
 
-        let r=await fetch(
-            '/api/export',
-            {
-                method:'POST',
-                headers:{
-                    'Content-Type':
-                    'application/json'
-                },
+    let r=await fetch(
 
-                body:JSON.stringify({
-                    format,
-                    questions,
-                    meta
-                })
+        '/api/export',
 
-            }
-        );
+        {
 
-        let b=await r.blob();
+            method:'POST',
 
-        let u=URL.createObjectURL(b);
+            headers:{
+                'Content-Type':
+                'application/json'
+            },
 
-        let a=document.createElement('a');
+            body:JSON.stringify({
 
-        a.href=u;
+                format,
+                questions,
+                meta
 
-        a.download=
-            format==='both'
-            ?'المستندات.zip'
-            :format==='pdf'
-            ?'المستند.pdf'
-            :'المستند.docx';
+            })
 
-        a.click();
+        }
 
-        URL.revokeObjectURL(u);
+    );
 
-    }
 
-    catch(e){
+    if(!r.ok){
 
         alert(
-            'حدث خطأ أثناء تصدير الملف.'
+            'حدث خطأ أثناء إنشاء الملف'
         );
+
+        return;
 
     }
 
+
+    let b=await r.blob();
+
+    let u=URL.createObjectURL(b);
+
+    let a=document.createElement('a');
+
+    a.href=u;
+
+    a.download=
+        format==='both'
+        ?'المستندات.zip'
+        :format==='pdf'
+        ?'المستند.pdf'
+        :'المستند.docx';
+
+    a.click();
+
+    URL.revokeObjectURL(u);
+
 }
+
 
 render();
 
