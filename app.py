@@ -13,7 +13,30 @@ from reportlab.pdfbase.ttfonts import TTFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 app = Flask(__name__)
+# خط عربي
+FONT_PATH = os.path.join(
+    BASE_DIR,
+    "fonts",
+    "DejaVuSans.ttf"
+)
 
+if os.path.exists(FONT_PATH):
+    pdfmetrics.registerFont(
+        TTFont("ArabicFont", FONT_PATH)
+    )
+
+
+def ar(text):
+    """
+    تجهيز النص العربي لظهوره بشكل صحيح في PDF
+    """
+    text = str(text or "")
+
+    try:
+        reshaped = arabic_reshaper.reshape(text)
+        return get_display(reshaped)
+    except Exception:
+        return text
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE_DIR, "data", "curriculum.json")
 
