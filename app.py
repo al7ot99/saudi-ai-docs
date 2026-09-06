@@ -8,7 +8,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from docx import Document
 from docx.shared import Pt
-
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import arabic_reshaper
+from bidi.algorithm import get_display
 app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
