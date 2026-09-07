@@ -8,35 +8,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from docx import Document
 from docx.shared import Pt
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-import arabic_reshaper
-from bidi.algorithm import get_display
+
 app = Flask(__name__)
-# خط عربي
-FONT_PATH = os.path.join(
-    BASE_DIR,
-    "fonts",
-    "DejaVuSans.ttf"
-)
 
-if os.path.exists(FONT_PATH):
-    pdfmetrics.registerFont(
-        TTFont("ArabicFont", FONT_PATH)
-    )
-
-
-def ar(text):
-    """
-    تجهيز النص العربي لظهوره بشكل صحيح في PDF
-    """
-    text = str(text or "")
-
-    try:
-        reshaped = arabic_reshaper.reshape(text)
-        return get_display(reshaped)
-    except Exception:
-        return text
+# مسار المشروع
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE_DIR, "data", "curriculum.json")
 
@@ -46,11 +21,19 @@ def curriculum():
         return json.load(f)
 
 
+# =========================================================
+# توليد الأسئلة
+# =========================================================
+
 def generate_questions(p):
-    c = p["counts"]
-    lessons = p["lessons"]
-    out = []
-    n = 1
+    counts = p.get("counts", {})
+    lessons = p.get("lessons", [])
+
+    if not lessons:
+        lessons = ["الدرس المحدد"]
+
+    questions = []
+    number = 1
 
     types = [
         ("mcq", "اختيار من متعدد"),
@@ -61,13 +44,17 @@ def generate_questions(p):
     ]
 
     for key, label in types:
-        for _ in range(int(c.get(key, 0))):
 
-            lesson = lessons[(n - 1) % len(lessons)] if lessons else "الدرس المحدد"
+        amount = int(counts.get(key, 0))
+
+        for _ in range(amount):
+
+            lesson = lessons[(number - 1) % len(lessons)]
 
             if key == "mcq":
                 text = f"اختر الإجابة الصحيحة وفق محتوى «{lesson}»."
-                opts = [
+
+                options = [
                     "أ) الإجابة الأولى",
                     "ب) الإجابة الثانية",
                     "ج) الإجابة الثالثة",
@@ -76,614 +63,323 @@ def generate_questions(p):
 
             elif key == "tf":
                 text = f"صح أم خطأ: العبارة التالية مرتبطة بمحتوى «{lesson}»."
-                opts = []
+                options = ["☐ صح", "☐ خطأ"]
 
             elif key == "fill":
-                text = f"أكمل الفراغ من محتوى «{lesson}»: __________."
-                opts = []
+                text = f"أكمل الفراغ من محتوى «{lesson}»: ____________________."
+                options = []
 
             elif key == "match":
                 text = f"صل عناصر «{lesson}» بالمصطلحات المناسبة."
-                opts = [
-                    "(1) __________    (أ) __________",
-                    "(2) __________    (ب) __________"
+
+                options = [
+                    "(1) __________________    (أ) __________________",
+                    "(2) __________________    (ب) __________________"
                 ]
 
             else:
                 text = f"صل الكلمة بالصورة المناسبة من محتوى «{lesson}»."
-                opts = [
-                    "[صورة 1]    [صورة 2]    [صورة 3]"
+
+                options = [
+                    "① صورة    ② صورة    ③ صورة"
                 ]
 
-            out.append({
-                "n": n,
+            questions.append({
+                "n": number,
                 "type": label,
                 "lesson": lesson,
                 "text": text,
-                "options": opts
+                "options": options
             })
 
-            n += 1
+            number += 1
 
-    return out
+    return questions
 
+
+# =========================================================
+# الصفحة الرئيسية
+# =========================================================
 
 @app.get("/")
 def home():
-    return render_template("index.html", data=curriculum())
+    return render_template(
+        "index.html",
+        data=curriculum()
+    )
 
+
+# =========================================================
+# توليد الأسئلة
+# =========================================================
 
 @app.post("/api/generate")
-def gen():
+def generate():
+
+    data = request.get_json()
+
     return jsonify({
         "ok": True,
-        "questions": generate_questions(request.get_json())
+        "questions": generate_questions(data)
     })
 
 
-# ---------------------------------------------------------
-# Word
-# ---------------------------------------------------------
+# =========================================================
+# إنشاء Word
+# =========================================================
 
-def docx_bytes(qs, meta):
+def docx_bytes(questions, meta):
 
-    d = Document()
+    document = Document()
 
-    d.styles["Normal"].font.name = "Arial"
-    d.styles["Normal"].font.size = Pt(11)
-
-    # العنوان
-    p = d.add_paragraph()
-    p.alignment = 1
-
-    r = p.add_run(meta.get("title", "مستند تعليمي"))
-    r.bold = True
-    r.font.size = Pt(16)
-
-    # بيانات الطالب
-    student = d.add_paragraph()
-    student.alignment = 2
-
-    r = student.add_run("اسم الطالب: ______________________________")
-    r.bold = True
-
-    # بيانات المستند
-    info = []
-
-    for k in [
-        "stage",
-        "grade",
-        "subject",
-        "term",
-        "unit",
-        "teacher",
-        "school"
-    ]:
-        if meta.get(k):
-            info.append(str(meta[k]))
-
-    if info:
-        p = d.add_paragraph()
-        p.alignment = 2
-        p.add_run(" | ".join(info))
-
-    d.add_paragraph("")
-
-    # الأسئلة
-    for q in qs:
-
-        p = d.add_paragraph()
-        p.paragraph_format.space_after = Pt(2)
-
-        r = p.add_run(f"{q['n']}. {q['text']}")
-        r.bold = True
-
-        # الاختيار من متعدد في سطر واحد
-        if q.get("options"):
-
-            p = d.add_paragraph()
-            p.paragraph_format.space_after = Pt(3)
-
-            if q["type"] == "اختيار من متعدد":
-                p.add_run("    ".join(q["options"]))
-
-            else:
-                p.add_run("    ".join(q["options"]))
-
-    b = io.BytesIO()
-    d.save(b)
-
-    return b.getvalue()
-
-
-# ---------------------------------------------------------
-# PDF
-# ---------------------------------------------------------
-
-def pdf_bytes(qs, meta):
-
-    b = io.BytesIO()
-
-    c = canvas.Canvas(b, pagesize=A4)
-
-    w, h = A4
-
-    right = w - 35
-    y = h - 35
-
-    # اختيار الخط
-    if os.path.exists(FONT_PATH):
-        c.setFont("ArabicFont", 15)
-    else:
-        c.setFont("Helvetica-Bold", 15)
+    normal = document.styles["Normal"]
+    normal.font.name = "Arial"
+    normal.font.size = Pt(12)
 
     # العنوان
-    title = meta.get(
-        "title",
-        "مستند تعليمي"
+    paragraph = document.add_paragraph()
+    paragraph.alignment = 1
+
+    run = paragraph.add_run(
+        meta.get("title", "مستند تعليمي")
     )
 
-    if os.path.exists(FONT_PATH):
-        c.drawRightString(
-            right,
-            y,
-            ar(title)
-        )
-    else:
-        c.drawRightString(
-            right,
-            y,
-            title
-        )
+    run.bold = True
+    run.font.size = Pt(18)
 
-    y -= 25
+    # بيانات الاختبار
+    info = [
+        ("المرحلة", "stage"),
+        ("الصف", "grade"),
+        ("المادة", "subject"),
+        ("الفصل الدراسي", "term"),
+        ("الوحدة", "unit"),
+        ("المعلم", "teacher"),
+        ("المدرسة", "school")
+    ]
+
+    for label, key in info:
+
+        if meta.get(key):
+
+            p = document.add_paragraph()
+
+            r = p.add_run(
+                f"{label}: {meta.get(key)}"
+            )
+
+            r.font.size = Pt(11)
 
     # اسم الطالب
-    if os.path.exists(FONT_PATH):
-        c.setFont("ArabicFont", 11)
+    p = document.add_paragraph()
 
-        c.drawRightString(
-            right,
-            y,
-            ar(
-                "اسم الطالب: ______________________________"
-            )
-        )
-
-    else:
-        c.setFont("Helvetica-Bold", 11)
-
-        c.drawRightString(
-            right,
-            y,
-            "اسم الطالب: ______________________________"
-        )
-
-    y -= 22
-
-    # معلومات الورقة
-    info = []
-
-    for k in [
-        "stage",
-        "grade",
-        "subject",
-        "term",
-        "unit"
-    ]:
-
-        if meta.get(k):
-            info.append(
-                str(meta[k])
-            )
-
-    if info:
-
-        info_text = " | ".join(info)
-
-        if os.path.exists(FONT_PATH):
-
-            c.setFont(
-                "ArabicFont",
-                8.5
-            )
-
-            c.drawRightString(
-                right,
-                y,
-                ar(info_text)
-            )
-
-        else:
-
-            c.setFont(
-                "Helvetica",
-                8.5
-            )
-
-            c.drawRightString(
-                right,
-                y,
-                info_text[:120]
-            )
-
-        y -= 18
-
-    # خط فاصل
-    c.line(
-        35,
-        y,
-        w - 35,
-        y
+    r = p.add_run(
+        "اسم الطالب: __________________________________________"
     )
 
-    y -= 16
+    r.bold = True
+
+    document.add_paragraph("")
 
     # الأسئلة
-    for q in qs:
+    for q in questions:
 
-        question = (
-            f"{q['n']}. "
-            f"{q['text']}"
+        p = document.add_paragraph()
+
+        r = p.add_run(
+            f"{q['n']}. {q['text']}"
         )
 
-        # إذا اقتربنا من نهاية الصفحة
-        if y < 55:
+        r.bold = True
 
-            c.showPage()
-
-            y = h - 40
-
-        # السؤال
-        if os.path.exists(FONT_PATH):
-
-            c.setFont(
-                "ArabicFont",
-                9
-            )
-
-            c.drawRightString(
-                right,
-                y,
-                ar(question)
-            )
-
-        else:
-
-            c.setFont(
-                "Helvetica",
-                9
-            )
-
-            c.drawRightString(
-                right,
-                y,
-                question[:125]
-            )
-
-        y -= 13
-
-        # اختيار من متعدد
+        # الاختيارات في نفس السطر
         if q.get("type") == "اختيار من متعدد":
 
-            options = q.get(
-                "options",
-                []
+            p = document.add_paragraph()
+
+            options = q.get("options", [])
+
+            r = p.add_run(
+                "     ".join(options)
             )
 
-            # إضافة علامة اختيار أمام كل خيار
-            options_line = "     ".join(
-                [
-                    "☐ " + str(x)
-                    for x in options
-                ]
-            )
-
-            if os.path.exists(FONT_PATH):
-
-                c.setFont(
-                    "ArabicFont",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    ar(options_line)
-                )
-
-            else:
-
-                c.setFont(
-                    "Helvetica",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    options_line[:125]
-                )
-
-            y -= 13
-
-        # صح أو خطأ
         elif q.get("type") == "صح أو خطأ":
 
-            tf = "☐ صح       ☐ خطأ"
+            p = document.add_paragraph()
 
-            if os.path.exists(FONT_PATH):
-
-                c.setFont(
-                    "ArabicFont",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    ar(tf)
-                )
-
-            else:
-
-                c.setFont(
-                    "Helvetica",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    tf
-                )
-
-            y -= 13
-
-        # أكمل الفراغ
-        elif q.get("type") == "أكمل الفراغ":
-
-            line = "________________________________________"
-
-            if os.path.exists(FONT_PATH):
-
-                c.setFont(
-                    "ArabicFont",
-                    8
-                )
-
-            else:
-
-                c.setFont(
-                    "Helvetica",
-                    8
-                )
-
-            c.drawRightString(
-                right,
-                y,
-                line
+            p.add_run(
+                "☐ صح                 ☐ خطأ"
             )
 
-            y -= 13
+        elif q.get("options"):
 
-        # توصيل
-        elif q.get("type") == "صل الكلمة بالمصطلح المناسب":
+            for option in q["options"]:
 
-            match_text = (
-                "(1) __________     (أ) __________     "
-                "(2) __________     (ب) __________"
-            )
+                p = document.add_paragraph()
 
-            if os.path.exists(FONT_PATH):
+                p.add_run(option)
 
-                c.setFont(
-                    "ArabicFont",
-                    8
-                )
+    output = io.BytesIO()
 
-                c.drawRightString(
-                    right,
-                    y,
-                    ar(match_text)
-                )
+    document.save(output)
 
-            else:
+    return output.getvalue()
 
-                c.setFont(
-                    "Helvetica",
-                    8
-                )
 
-                c.drawRightString(
-                    right,
-                    y,
-                    match_text
-                )
+# =========================================================
+# إنشاء PDF
+# =========================================================
 
-            y -= 13
+def pdf_bytes(questions, meta):
 
-        # توصيل بالصورة
-        else:
+    output = io.BytesIO()
 
-            image_text = (
-                "☐ صورة 1       "
-                "☐ صورة 2       "
-                "☐ صورة 3"
-            )
+    pdf = canvas.Canvas(
+        output,
+        pagesize=A4
+    )
 
-            if os.path.exists(FONT_PATH):
+    width, height = A4
 
-                c.setFont(
-                    "ArabicFont",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    ar(image_text)
-                )
-
-            else:
-
-                c.setFont(
-                    "Helvetica",
-                    8
-                )
-
-                c.drawRightString(
-                    right,
-                    y,
-                    image_text
-                )
-
-            y -= 13
-
-        # مسافة بسيطة بين الأسئلة
-        y -= 4
-
-    c.save()
-
-    return b.getvalue()
-    b = io.BytesIO()
-
-    c = canvas.Canvas(b, pagesize=A4)
-
-    w, h = A4
-
-    right = w - 35
-    y = h - 35
+    y = height - 45
 
     # العنوان
-    c.setFont("Helvetica-Bold", 15)
-    c.drawRightString(
-        right,
+    pdf.setFont(
+        "Helvetica-Bold",
+        16
+    )
+
+    pdf.drawRightString(
+        width - 40,
         y,
         meta.get("title", "مستند تعليمي")
     )
 
-    y -= 25
+    y -= 30
 
-    # اسم الطالب
-    c.setFont("Helvetica-Bold", 11)
-    c.drawRightString(
-        right,
-        y,
-        "اسم الطالب: ______________________________"
+    pdf.setFont(
+        "Helvetica",
+        10
     )
 
-    y -= 22
+    info = [
+        ("المرحلة", "stage"),
+        ("الصف", "grade"),
+        ("المادة", "subject"),
+        ("الفصل الدراسي", "term"),
+        ("الوحدة", "unit"),
+        ("المعلم", "teacher"),
+        ("المدرسة", "school")
+    ]
 
-    # البيانات
-    c.setFont("Helvetica", 9)
+    for label, key in info:
 
-    info = []
+        if meta.get(key):
 
-    for k in [
-        "stage",
-        "grade",
-        "subject",
-        "term",
-        "unit",
-        "teacher",
-        "school"
-    ]:
-        if meta.get(k):
-            info.append(str(meta[k]))
+            pdf.drawRightString(
+                width - 40,
+                y,
+                f"{label}: {meta.get(key)}"
+            )
 
-    if info:
-        c.drawRightString(
-            right,
-            y,
-            " | ".join(info)[:120]
-        )
+            y -= 15
 
-        y -= 20
+    # اسم الطالب
+    y -= 5
 
-    # خط فاصل
-    c.line(35, y, w - 35, y)
+    pdf.setFont(
+        "Helvetica-Bold",
+        11
+    )
 
-    y -= 18
+    pdf.drawRightString(
+        width - 40,
+        y,
+        "اسم الطالب: __________________________________________"
+    )
+
+    y -= 25
+
+    pdf.setFont(
+        "Helvetica",
+        10
+    )
 
     # الأسئلة
-    for q in qs:
+    for q in questions:
 
-        question = f"{q['n']}. {q['text']}"
+        lines = [
+            f"{q['n']}. {q['text']}"
+        ]
 
-        if y < 55:
-            c.showPage()
-            y = h - 40
+        if q.get("type") == "اختيار من متعدد":
 
-        c.setFont("Helvetica-Bold", 9)
+            lines.append(
+                "     ".join(q.get("options", []))
+            )
 
-        c.drawRightString(
-            right,
-            y,
-            question[:125]
-        )
+        elif q.get("type") == "صح أو خطأ":
 
-        y -= 13
+            lines.append(
+                "☐ صح                 ☐ خطأ"
+            )
 
-        # الاختيارات في سطر واحد
-        if q.get("options"):
+        else:
 
-            c.setFont("Helvetica", 8.5)
+            lines.extend(
+                q.get("options", [])
+            )
 
-            if q["type"] == "اختيار من متعدد":
+        for line in lines:
 
-                options_line = "    ".join(q["options"])
+            if y < 45:
 
-                c.drawRightString(
-                    right,
-                    y,
-                    options_line[:125]
+                pdf.showPage()
+
+                y = height - 45
+
+                pdf.setFont(
+                    "Helvetica",
+                    10
                 )
 
-                y -= 13
+            pdf.drawRightString(
+                width - 40,
+                y,
+                line[:115]
+            )
 
-            else:
+            y -= 16
 
-                for option in q["options"]:
+        y -= 7
 
-                    if y < 45:
-                        c.showPage()
-                        y = h - 40
-                        c.setFont("Helvetica", 8.5)
+    pdf.save()
 
-                    c.drawRightString(
-                        right,
-                        y,
-                        option[:125]
-                    )
-
-                    y -= 12
-
-        # مسافة صغيرة فقط بين الأسئلة
-        y -= 5
-
-    c.save()
-
-    return b.getvalue()
+    return output.getvalue()
 
 
-# ---------------------------------------------------------
-# Export
-# ---------------------------------------------------------
+# =========================================================
+# التصدير
+# =========================================================
 
 @app.post("/api/export")
 def export():
 
-    p = request.get_json()
+    data = request.get_json()
 
-    qs = p["questions"]
-    meta = p["meta"]
-    fmt = p["format"]
+    questions = data["questions"]
+    meta = data["meta"]
+    fmt = data["format"]
 
     if fmt == "pdf":
 
         return send_file(
-            io.BytesIO(pdf_bytes(qs, meta)),
+            io.BytesIO(
+                pdf_bytes(
+                    questions,
+                    meta
+                )
+            ),
             as_attachment=True,
             download_name="المستند.pdf",
             mimetype="application/pdf"
@@ -692,41 +388,58 @@ def export():
     if fmt == "docx":
 
         return send_file(
-            io.BytesIO(docx_bytes(qs, meta)),
+            io.BytesIO(
+                docx_bytes(
+                    questions,
+                    meta
+                )
+            ),
             as_attachment=True,
             download_name="المستند.docx",
             mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
-    z = io.BytesIO()
+    # PDF + Word
+    output = io.BytesIO()
 
     with zipfile.ZipFile(
-        z,
+        output,
         "w",
         zipfile.ZIP_DEFLATED
-    ) as f:
+    ) as archive:
 
-        f.writestr(
+        archive.writestr(
             "المستند.pdf",
-            pdf_bytes(qs, meta)
+            pdf_bytes(
+                questions,
+                meta
+            )
         )
 
-        f.writestr(
+        archive.writestr(
             "المستند.docx",
-            docx_bytes(qs, meta)
+            docx_bytes(
+                questions,
+                meta
+            )
         )
 
-    z.seek(0)
+    output.seek(0)
 
     return send_file(
-        z,
+        output,
         as_attachment=True,
         download_name="المستندات.zip",
         mimetype="application/zip"
     )
 
 
+# =========================================================
+# تشغيل الموقع
+# =========================================================
+
 if __name__ == "__main__":
+
     app.run(
         host="0.0.0.0",
         port=5000
