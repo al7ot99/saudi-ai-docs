@@ -1,12 +1,4 @@
 {
-  "academic_year": "1448-1449",
-
-  "stages": [
-    "ابتدائي",
-    "متوسط",
-    "ثانوي"
-  ],
-
   "grades": {
     "ابتدائي": [
       "الأول الابتدائي",
@@ -16,52 +8,140 @@
       "الخامس الابتدائي",
       "السادس الابتدائي"
     ],
-
     "متوسط": [
       "الأول المتوسط",
       "الثاني المتوسط",
       "الثالث المتوسط"
     ],
-
     "ثانوي": [
-      "السنة الأولى المشتركة",
-      "السنة الثانية",
-      "السنة الثالثة"
+      "الأول الثانوي",
+      "الثاني الثانوي",
+      "الثالث الثانوي"
     ]
   },
 
-  "terms": [
-    "الفصل الدراسي الأول",
-    "الفصل الدراسي الثاني"
-  ],
-
-  "document_types": [
-    "اختبار",
-    "ورقة عمل",
-    "مراجعة",
-    "واجب",
-    "أسئلة تدريبية",
-    "نشاط تعليمي",
-    "ملخص"
-  ],
-
-  "question_types": [
-    "اختيار من متعدد",
-    "صح أو خطأ",
-    "أكمل الفراغ",
-    "توصيل الكلمة بالمصطلح المناسب",
-    "توصيل الكلمة بالصورة المناسبة"
-  ],
-
   "subjects": [
-    "اللغة العربية",
-    "اللغة الإنجليزية",
-    "الرياضيات",
-    "العلوم",
-    "الدراسات الاجتماعية",
-    "المهارات الرقمية",
-    "التربية الإسلامية"
+    "اللغة الإنجليزية"
   ],
 
-  "curriculum": {}
+  "curriculum": {
+    "الثاني المتوسط": {
+      "اللغة الإنجليزية": {
+        "الفصل الدراسي الأول": {
+
+          "Unit 1: Are You Here on Vacation?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 2: What Are They Making?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 3: Who's Who?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 4: Favorite Pastimes": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 5: Is There Any Ice Cream?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 6: What Was It Like?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 7: What Happened?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ],
+
+          "Unit 8: What's Wrong?": [
+            "Listen and Discuss",
+            "Pair Work",
+            "Grammar",
+            "Listening",
+            "Pronunciation",
+            "Conversation",
+            "About You",
+            "Reading",
+            "Writing",
+            "Project",
+            "Form, Meaning and Function"
+          ]
+        }
+      }
+    }
+  }
 }
