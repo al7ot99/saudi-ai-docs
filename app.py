@@ -1,6 +1,7 @@
-import io
+
 import json
 import os
+import re
 import zipfile
 from pathlib import Path
 from typing import List
@@ -77,6 +78,32 @@ def int_count(value):
 
 def total_requested(counts):
     return sum(int_count(counts.get(k, 0)) for k in TYPE_LABELS)
+
+
+def strip_option_prefix(value):
+    """يحذف أي ترقيم/حروف سابقة من الخيار حتى نعيد ترقيمه 1-4 بشكل موحد."""
+    value = str(value or "").strip()
+    patterns = [
+        r"^\s*[1-4]\s*[\.\-\)\:]\s*",
+        r"^\s*[أبجد]\s*[\.\-\)\:]\s*",
+        r"^\s*[أبجد]\s*\)\s*",
+    ]
+    for pattern in patterns:
+        value = re.sub(pattern, "", value, count=1)
+    return value.strip()
+
+
+def numbered_mcq_options(options):
+    """يعيد أول أربعة خيارات مرقمة من 1 إلى 4."""
+    clean = [strip_option_prefix(x) for x in (options or [])]
+    clean = [x for x in clean if x][:4]
+    return [f"{i}. {value}" for i, value in enumerate(clean, start=1)]
+
+
+def compact_term(term):
+    """يختصر 'الفصل الدراسي الأول' إلى 'الأول' للعنوان المختصر."""
+    term = str(term or "").strip()
+    return term.replace("الفصل الدراسي ", "").strip() or term
 
 
 def normalize_lessons(payload):
@@ -173,6 +200,7 @@ def build_generation_prompt(payload):
    - أعطِ 4 خيارات فقط.
    - خيار واحد صحيح بوضوح.
    - اجعل الخيارات متقاربة ومعقولة.
+   - لا تضع أرقامًا أو حروفًا قبل نص الخيار؛ النظام سيقوم بترقيم الخيارات من 1 إلى 4 تلقائيًا.
 5) في صح أو خطأ:
    - اجعل العبارة تعليمية واضحة.
    - answer يجب أن يكون "صح" أو "خطأ".
@@ -208,7 +236,7 @@ def fallback_questions(payload):
 
             if key == "mcq":
                 text = f"اختر الإجابة الصحيحة المرتبطة بمفهوم رئيس في درس «{lesson}»."
-                options = ["أ) الخيار الأول", "ب) الخيار الثاني", "ج) الخيار الثالث", "د) الخيار الرابع"]
+                options = ["الخيار الأول", "الخيار الثاني", "الخيار الثالث", "الخيار الرابع"]
                 answer = ""
             elif key == "tf":
                 text = f"صح أم خطأ: اكتب حكم العبارة المتعلقة بدرس «{lesson}»."
@@ -279,12 +307,16 @@ def ai_generate_questions(payload):
 
     questions = []
     for i, q in enumerate(parsed.questions[:total], start=1):
+        options = q.options or []
+        if q.type == "اختيار من متعدد":
+            options = [strip_option_prefix(x) for x in options][:4]
+
         questions.append({
             "n": i,
             "type": q.type,
             "lesson": q.lesson,
             "text": q.text,
-            "options": q.options or [],
+            "options": options,
             "answer": q.answer or "",
             "explanation": q.explanation or "",
         })
@@ -362,27 +394,23 @@ def docx_bytes(qs, meta):
     title = meta.get("title") or meta.get("documentType") or "مستند تعليمي"
     add_docx_line(d, title, bold=True, size=18, center=True)
 
-    # اسم الطالب أولاً حسب المطلوب
+    # بيانات المستند المختصرة في سطر واحد فوق اسم الطالب
+    subject = str(meta.get("subject") or "—")
+    grade = str(meta.get("grade") or "—")
+    term = compact_term(meta.get("term"))
+    teacher = str(meta.get("teacher") or "—")
+    info_line = (
+        f"المادة: {subject}  |  الصف: {grade}  |  "
+        f"الفصل الدراسي: {term or '—'}  |  المعلم: {teacher}"
+    )
+    add_docx_line(d, info_line, bold=True, size=11)
+
     p = d.add_paragraph()
     set_rtl(p)
     r = p.add_run("اسم الطالب/ـة: ______________________________")
     r.bold = True
     r.font.name = "Arial"
     r.font.size = Pt(12)
-
-    info_items = [
-        ("المرحلة", meta.get("stage")),
-        ("الصف", meta.get("grade")),
-        ("المسار", meta.get("track")),
-        ("المادة", meta.get("subject")),
-        ("الفصل الدراسي", meta.get("term")),
-        ("نوع المستند", meta.get("documentType")),
-        ("المعلم/ـة", meta.get("teacher")),
-        ("المدرسة", meta.get("school")),
-    ]
-    for label, value in info_items:
-        if value:
-            add_docx_line(d, f"{label}: {value}", size=11)
 
     d.add_paragraph("")
 
@@ -392,8 +420,8 @@ def docx_bytes(qs, meta):
         opts = q.get("options") or []
         if opts:
             # خيارات الاختيار من متعدد في سطر واحد
-            if q.get("type") == "اختيار من متعدد" and len(opts) <= 4:
-                add_docx_line(d, "     ".join(opts), size=11)
+            if q.get("type") == "اختيار من متعدد":
+                add_docx_line(d, "     ".join(numbered_mcq_options(opts)), size=11)
             else:
                 for x in opts:
                     add_docx_line(d, x, size=11)
@@ -485,22 +513,18 @@ def pdf_bytes(qs, meta):
 
     title = meta.get("title") or meta.get("documentType") or "مستند تعليمي"
     draw_right(title, 17, 22)
-    draw_right("اسم الطالب/ـة: ______________________________", 11, 18)
 
-    info_items = [
-        ("المرحلة", meta.get("stage")),
-        ("الصف", meta.get("grade")),
-        ("المسار", meta.get("track")),
-        ("المادة", meta.get("subject")),
-        ("الفصل الدراسي", meta.get("term")),
-        ("نوع المستند", meta.get("documentType")),
-        ("المعلم/ـة", meta.get("teacher")),
-        ("المدرسة", meta.get("school")),
-    ]
-
-    for label, value in info_items:
-        if value:
-            draw_right(f"{label}: {value}", 10, 15)
+    # بيانات المستند المختصرة في سطر واحد فوق اسم الطالب
+    subject = str(meta.get("subject") or "—")
+    grade = str(meta.get("grade") or "—")
+    term = compact_term(meta.get("term"))
+    teacher = str(meta.get("teacher") or "—")
+    info_line = (
+        f"المادة: {subject} | الصف: {grade} | "
+        f"الفصل الدراسي: {term or '—'} | المعلم: {teacher}"
+    )
+    draw_right(info_line, 10, 17)
+    draw_right("اسم الطالب/ـة: ______________________________", 11, 19)
 
     y -= 8
 
@@ -509,8 +533,8 @@ def pdf_bytes(qs, meta):
         opts = q.get("options") or []
 
         if opts:
-            if q.get("type") == "اختيار من متعدد" and len(opts) <= 4:
-                draw_right("     ".join(opts), 9, 15)
+            if q.get("type") == "اختيار من متعدد":
+                draw_right("     ".join(numbered_mcq_options(opts)), 9, 15)
             else:
                 for x in opts:
                     draw_right(x, 9, 14)
