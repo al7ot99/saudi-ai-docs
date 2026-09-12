@@ -242,10 +242,30 @@
             display: none;
         }
 
+        .preview-title {
+            text-align: center;
+            margin: 0 0 18px;
+            font-size: 25px;
+            color: #111;
+        }
+
+        .document-info-line {
+            width: 100%;
+            border: 1px solid #d7dde6;
+            background: #f8fafc;
+            border-radius: 7px;
+            padding: 9px 12px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1.8;
+        }
+
         .student-line {
-            margin: 20px 0;
-            padding-bottom: 8px;
+            margin: 0 0 20px;
+            padding: 9px 0 10px;
             border-bottom: 1px solid #aaa;
+            font-weight: bold;
         }
 
         .question {
@@ -255,13 +275,24 @@
 
         .question-text {
             font-weight: bold;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            line-height: 1.7;
         }
 
         .options {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 14px 28px;
+            line-height: 1.8;
+        }
+
+        .option-item {
+            min-width: 150px;
+        }
+
+        .option-number {
+            font-weight: bold;
+            margin-left: 4px;
         }
 
         .loading {
@@ -284,17 +315,21 @@
             margin-top: 7px;
         }
 
-        @media(max-width:600px) {
+        @media(max-width:700px) {
 
             header h1 {
                 font-size: 22px;
+            }
+
+            .document-info-line {
+                font-size: 13px;
             }
 
             .options {
                 display: block;
             }
 
-            .options div {
+            .option-item {
                 margin-bottom: 7px;
             }
 
@@ -383,11 +418,9 @@
                 id="grade"
                 onchange="gradeChanged()"
             >
-
                 <option value="">
                     اختر المرحلة أولاً
                 </option>
-
             </select>
 
         </div>
@@ -481,11 +514,9 @@
                 id="subject"
                 onchange="subjectChanged()"
             >
-
                 <option value="">
                     اختر المادة
                 </option>
-
             </select>
 
         </div>
@@ -964,14 +995,6 @@ function getSelectedTrackData() {
     }
 
 
-    /*
-      إذا كان curriculum.json مبنياً بالطريقة الجديدة:
-
-      السنة الثانية
-          -> المسار العام
-              -> المواد
-    */
-
     if (
         isSecondaryTrackGrade(grade) &&
         track &&
@@ -983,11 +1006,6 @@ function getSelectedTrackData() {
 
     }
 
-
-    /*
-      دعم البنية القديمة أيضاً إذا كانت المواد
-      موجودة مباشرة داخل السنة.
-    */
 
     return gradeData;
 
@@ -1026,12 +1044,12 @@ function belongsToAnotherTrack(subjectName, selectedTrack) {
 
 
 /* ==========================================
-   تنسيق اسم المادة للعرض
+   تنسيق اسم المادة
 ========================================== */
 
 function cleanSubjectName(subjectName) {
 
-    return subjectName
+    return String(subjectName || '')
         .replace(' - مسار علوم الحاسب والهندسة', '')
         .replace(' - مسار الصحة والحياة', '')
         .replace(' - مسار إدارة الأعمال', '')
@@ -1054,9 +1072,6 @@ function loadSubjects() {
     const grade =
         document.getElementById('grade').value;
 
-    const term =
-        document.getElementById('term').value;
-
     const track =
         document.getElementById('track').value;
 
@@ -1073,11 +1088,6 @@ function loadSubjects() {
     }
 
 
-    /*
-      السنة الثانية والثالثة الثانوية
-      يجب اختيار المسار أولاً.
-    */
-
     if (
         stage === 'ثانوي' &&
         isSecondaryTrackGrade(grade) &&
@@ -1093,11 +1103,6 @@ function loadSubjects() {
         getSelectedTrackData();
 
 
-    /*
-      الطريقة الأفضل:
-      نستخرج المواد الموجودة فعلياً داخل curriculum.
-    */
-
     if (
         subjectData &&
         typeof subjectData === 'object'
@@ -1108,11 +1113,6 @@ function loadSubjects() {
 
 
         subjectNames.forEach(subjectName => {
-
-            /*
-              في حالة استخدام بنية البيانات القديمة،
-              نخفي المواد التي تحمل اسم مسار آخر.
-            */
 
             if (
                 stage === 'ثانوي' &&
@@ -1126,19 +1126,14 @@ function loadSubjects() {
             }
 
 
-            const value =
-                subjectName;
-
-            const label =
-                cleanSubjectName(subjectName);
-
-
             const option =
                 document.createElement('option');
 
-            option.value = value;
+            option.value =
+                subjectName;
 
-            option.textContent = label;
+            option.textContent =
+                cleanSubjectName(subjectName);
 
             subjectSelect.appendChild(option);
 
@@ -1149,11 +1144,6 @@ function loadSubjects() {
 
     }
 
-
-    /*
-      دعم النظام القديم الذي يستخدم
-      curriculumData.subjects
-    */
 
     const subjects =
         curriculumData.subjects || [];
@@ -1204,11 +1194,6 @@ function getSubjectData() {
     }
 
 
-    /*
-      البنية الجديدة للثانوية:
-      الصف -> المسار -> المادة
-    */
-
     if (
         isSecondaryTrackGrade(grade) &&
         track &&
@@ -1220,11 +1205,6 @@ function getSubjectData() {
 
     }
 
-
-    /*
-      البنية القديمة:
-      الصف -> المادة
-    */
 
     return gradeData[subject] || null;
 
@@ -1326,10 +1306,6 @@ function loadCurriculum() {
     box.innerHTML = '';
 
 
-    /*
-      أزرار اختيار الكل وإلغاء الكل
-    */
-
     const tools =
         document.createElement('div');
 
@@ -1395,10 +1371,6 @@ function loadCurriculum() {
 
     box.appendChild(tools);
 
-
-    /*
-      عرض الوحدات والدروس
-    */
 
     Object.keys(curriculum).forEach(unitName => {
 
@@ -1673,17 +1645,18 @@ async function generateQuestions() {
             );
 
 
-        if (!response.ok) {
+        const data =
+            await response.json();
+
+
+        if (!response.ok || data.ok === false) {
 
             throw new Error(
+                data.error ||
                 'فشل إنشاء الأسئلة'
             );
 
         }
-
-
-        const data =
-            await response.json();
 
 
         generatedQuestions =
@@ -1706,6 +1679,7 @@ async function generateQuestions() {
     } catch (error) {
 
         alert(
+            error.message ||
             'حدث خطأ أثناء إنشاء الأسئلة.'
         );
 
@@ -1717,6 +1691,52 @@ async function generateQuestions() {
             'none';
 
     }
+
+}
+
+
+/* ==========================================
+   اختصار اسم الفصل الدراسي
+========================================== */
+
+function compactTerm(term) {
+
+    return String(term || '')
+        .replace('الفصل الدراسي ', '')
+        .trim();
+
+}
+
+
+/* ==========================================
+   إزالة أي ترقيم سابق من الخيارات
+========================================== */
+
+function stripOptionPrefix(option) {
+
+    let text =
+        String(option || '').trim();
+
+
+    text = text.replace(
+        /^\s*[1-4]\s*[\.\-\)\:]\s*/,
+        ''
+    );
+
+
+    text = text.replace(
+        /^\s*[أبجد]\s*[\.\-\)\:]\s*/,
+        ''
+    );
+
+
+    text = text.replace(
+        /^\s*[أبجد]\s*\)\s*/,
+        ''
+    );
+
+
+    return text.trim();
 
 }
 
@@ -1742,71 +1762,77 @@ function showPreview(
         'مستند تعليمي';
 
 
+    const teacher =
+        document.getElementById('teacher').value.trim() ||
+        '—';
+
+
+    const subject =
+        cleanSubjectName(meta.subject) ||
+        '—';
+
+
+    const grade =
+        meta.grade ||
+        '—';
+
+
+    const term =
+        compactTerm(meta.term) ||
+        '—';
+
+
     let html = '';
 
 
+    /* عنوان المستند */
+
     html += `
-        <h1 style="text-align:center">
+        <h1 class="preview-title">
             ${escapeHtml(title)}
         </h1>
     `;
 
 
+    /*
+        بيانات المستند المختصرة
+        في سطر واحد فوق اسم الطالب
+    */
+
     html += `
-        <p>
-            <strong>المرحلة:</strong>
-            ${escapeHtml(meta.stage)}
+        <div class="document-info-line">
 
-            &nbsp;&nbsp;
+            المادة:
+            ${escapeHtml(subject)}
 
-            <strong>الصف:</strong>
-            ${escapeHtml(meta.grade)}
-        </p>
+            &nbsp; | &nbsp;
+
+            الصف:
+            ${escapeHtml(grade)}
+
+            &nbsp; | &nbsp;
+
+            الفصل الدراسي:
+            ${escapeHtml(term)}
+
+            &nbsp; | &nbsp;
+
+            المعلم:
+            ${escapeHtml(teacher)}
+
+        </div>
     `;
 
 
-    if (meta.track) {
-
-        html += `
-            <p>
-                <strong>المسار:</strong>
-                ${escapeHtml(meta.track)}
-            </p>
-        `;
-
-    }
-
-
-    html += `
-        <p>
-
-            <strong>المادة:</strong>
-            ${escapeHtml(
-                cleanSubjectName(meta.subject)
-            )}
-
-            &nbsp;&nbsp;
-
-            <strong>
-                ${escapeHtml(meta.term)}
-            </strong>
-
-        </p>
-    `;
-
-
-    html += `
-        <p>
-            <strong>نوع المستند:</strong>
-            ${escapeHtml(meta.documentType)}
-        </p>
-    `;
-
+    /* اسم الطالب */
 
     html += `
         <div class="student-line">
+
             اسم الطالب/ـة:
+
             ________________________________
+
         </div>
     `;
 
@@ -1827,6 +1853,7 @@ function showPreview(
 
             const number =
                 q.n || index + 1;
+
 
             html += `
                 <div class="question">
@@ -1850,17 +1877,63 @@ function showPreview(
                 `;
 
 
-                q.options.forEach(
-                    option => {
+                /*
+                    الاختيار من متعدد:
+                    ترقيم الخيارات من 1 إلى 4
+                */
 
-                        html += `
-                            <div>
-                                ${escapeHtml(option)}
-                            </div>
-                        `;
+                if (
+                    q.type === 'اختيار من متعدد'
+                ) {
 
-                    }
-                );
+                    q.options
+                        .slice(0, 4)
+                        .forEach(
+                            (option, optionIndex) => {
+
+                                const cleanOption =
+                                    stripOptionPrefix(option);
+
+
+                                html += `
+                                    <div class="option-item">
+
+                                        <span class="option-number">
+                                            ${optionIndex + 1}.
+                                        </span>
+
+                                        ${escapeHtml(cleanOption)}
+
+                                    </div>
+                                `;
+
+                            }
+                        );
+
+                }
+
+
+                /*
+                    أنواع الأسئلة الأخرى
+                */
+
+                else {
+
+                    q.options.forEach(
+                        option => {
+
+                            html += `
+                                <div class="option-item">
+
+                                    ${escapeHtml(option)}
+
+                                </div>
+                            `;
+
+                        }
+                    );
+
+                }
 
 
                 html += `
@@ -1991,8 +2064,25 @@ async function exportDocument(format) {
 
         if (!response.ok) {
 
+            let errorMessage =
+                'فشل تصدير المستند';
+
+
+            try {
+
+                const errorData =
+                    await response.json();
+
+                if (errorData.error) {
+                    errorMessage =
+                        errorData.error;
+                }
+
+            } catch (e) {}
+
+
             throw new Error(
-                'فشل تصدير المستند'
+                errorMessage
             );
 
         }
@@ -2041,6 +2131,7 @@ async function exportDocument(format) {
     } catch (error) {
 
         alert(
+            error.message ||
             'حدث خطأ أثناء تصدير المستند.'
         );
 
