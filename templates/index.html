@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>منشئ المستندات التعليمية</title>
 
     <style>
@@ -75,6 +76,12 @@
             background: white;
         }
 
+        select:focus,
+        input:focus {
+            outline: none;
+            border-color: #17365d;
+        }
+
         .stage-buttons {
             display: flex;
             gap: 10px;
@@ -104,6 +111,14 @@
             border-color: #17365d;
         }
 
+        #trackStep {
+            display: none;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f3f7fc;
+            border: 1px solid #d8e2ef;
+        }
+
         .lessons-box {
             border: 1px solid #d8dee7;
             border-radius: 10px;
@@ -114,6 +129,10 @@
 
         .unit {
             margin-bottom: 18px;
+        }
+
+        .unit:last-child {
+            margin-bottom: 0;
         }
 
         .unit-title {
@@ -133,11 +152,39 @@
             margin-bottom: 7px;
             border-radius: 7px;
             border: 1px solid #e0e4ea;
+            cursor: pointer;
+        }
+
+        .lesson-item:hover {
+            background: #f5f8fc;
         }
 
         .lesson-item input {
             width: 18px;
             height: 18px;
+            flex-shrink: 0;
+        }
+
+        .select-tools {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .mini-button {
+            border: 1px solid #17365d;
+            background: white;
+            color: #17365d;
+            padding: 8px 12px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .mini-button:hover {
+            background: #17365d;
+            color: white;
         }
 
         .counts {
@@ -187,6 +234,10 @@
             color: white;
         }
 
+        button:hover {
+            opacity: .92;
+        }
+
         .preview {
             display: none;
         }
@@ -227,7 +278,14 @@
             padding: 20px;
         }
 
+        .track-note {
+            color: #666;
+            font-size: 13px;
+            margin-top: 7px;
+        }
+
         @media(max-width:600px) {
+
             header h1 {
                 font-size: 22px;
             }
@@ -238,6 +296,19 @@
 
             .options div {
                 margin-bottom: 7px;
+            }
+
+            .stage-buttons {
+                display: grid;
+                grid-template-columns: 1fr;
+            }
+
+            .stage-buttons span {
+                text-align: center;
+            }
+
+            button {
+                width: 100%;
             }
         }
     </style>
@@ -250,55 +321,141 @@
     <p>المناهج التعليمية السعودية — العام الدراسي 1448-1449</p>
 </header>
 
+
 <div class="container">
 
+    <!-- إعداد المستند -->
     <div class="card">
 
         <h2>إعداد المستند</h2>
 
+
         <!-- المرحلة -->
         <div class="step">
+
             <label>1. اختر المرحلة التعليمية</label>
 
             <div class="stage-buttons">
 
                 <label>
-                    <input type="radio" name="stage" value="ابتدائي" onchange="stageChanged()">
+                    <input
+                        type="radio"
+                        name="stage"
+                        value="ابتدائي"
+                        onchange="stageChanged()"
+                    >
                     <span>ابتدائي</span>
                 </label>
 
                 <label>
-                    <input type="radio" name="stage" value="متوسط" onchange="stageChanged()">
+                    <input
+                        type="radio"
+                        name="stage"
+                        value="متوسط"
+                        onchange="stageChanged()"
+                    >
                     <span>متوسط</span>
                 </label>
 
                 <label>
-                    <input type="radio" name="stage" value="ثانوي" onchange="stageChanged()">
+                    <input
+                        type="radio"
+                        name="stage"
+                        value="ثانوي"
+                        onchange="stageChanged()"
+                    >
                     <span>ثانوي</span>
                 </label>
 
             </div>
+
         </div>
 
 
         <!-- الصف -->
         <div class="step">
-            <label for="grade">2. اختر الصف</label>
 
-            <select id="grade" onchange="loadCurriculum()">
-                <option value="">اختر المرحلة أولاً</option>
+            <label for="grade">
+                2. اختر الصف
+            </label>
+
+            <select
+                id="grade"
+                onchange="gradeChanged()"
+            >
+
+                <option value="">
+                    اختر المرحلة أولاً
+                </option>
+
             </select>
+
+        </div>
+
+
+        <!-- المسار -->
+        <div
+            class="step"
+            id="trackStep"
+        >
+
+            <label for="track">
+                3. اختر المسار
+            </label>
+
+            <select
+                id="track"
+                onchange="trackChanged()"
+            >
+
+                <option value="">
+                    اختر المسار
+                </option>
+
+                <option value="المسار العام">
+                    المسار العام
+                </option>
+
+                <option value="مسار علوم الحاسب والهندسة">
+                    مسار علوم الحاسب والهندسة
+                </option>
+
+                <option value="مسار الصحة والحياة">
+                    مسار الصحة والحياة
+                </option>
+
+                <option value="مسار إدارة الأعمال">
+                    مسار إدارة الأعمال
+                </option>
+
+                <option value="المسار الشرعي">
+                    المسار الشرعي
+                </option>
+
+            </select>
+
+            <div class="track-note">
+                يظهر اختيار المسار في السنة الثانية والثالثة الثانوية فقط.
+            </div>
+
         </div>
 
 
         <!-- الفصل -->
         <div class="step">
 
-            <label for="term">3. اختر الفصل الدراسي</label>
+            <label for="term">
+                الفصل الدراسي
+            </label>
 
-            <select id="term" onchange="loadCurriculum()">
+            <select
+                id="term"
+                onchange="termChanged()"
+            >
 
-                <option value="">اختر الفصل الدراسي</option>
+                <option value="">
+                    اختر الفصل الدراسي
+                </option>
 
                 <option value="الفصل الدراسي الأول">
                     الفصل الدراسي الأول
@@ -316,11 +473,18 @@
         <!-- المادة -->
         <div class="step">
 
-            <label for="subject">4. اختر المادة</label>
+            <label for="subject">
+                المادة
+            </label>
 
-            <select id="subject" onchange="loadCurriculum()">
+            <select
+                id="subject"
+                onchange="subjectChanged()"
+            >
 
-                <option value="">اختر المادة</option>
+                <option value="">
+                    اختر المادة
+                </option>
 
             </select>
 
@@ -330,12 +494,17 @@
         <!-- الوحدات والدروس -->
         <div class="step">
 
-            <label>5. اختر الوحدات والدروس</label>
+            <label>
+                اختر الوحدات والدروس
+            </label>
 
-            <div id="lessonsBox" class="lessons-box">
+            <div
+                id="lessonsBox"
+                class="lessons-box"
+            >
 
                 <div class="empty">
-                    اختر الصف والفصل والمادة لعرض الوحدات والدروس
+                    اختر المرحلة والصف والفصل والمادة لعرض الوحدات والدروس
                 </div>
 
             </div>
@@ -346,17 +515,39 @@
         <!-- نوع المستند -->
         <div class="step">
 
-            <label for="documentType">6. نوع المستند</label>
+            <label for="documentType">
+                نوع المستند
+            </label>
 
             <select id="documentType">
 
-                <option>اختبار</option>
-                <option>ورقة عمل</option>
-                <option>مراجعة</option>
-                <option>واجب</option>
-                <option>أسئلة تدريبية</option>
-                <option>نشاط تعليمي</option>
-                <option>ملخص</option>
+                <option value="اختبار">
+                    اختبار
+                </option>
+
+                <option value="ورقة عمل">
+                    ورقة عمل
+                </option>
+
+                <option value="مراجعة">
+                    مراجعة
+                </option>
+
+                <option value="واجب">
+                    واجب
+                </option>
+
+                <option value="أسئلة تدريبية">
+                    أسئلة تدريبية
+                </option>
+
+                <option value="نشاط تعليمي">
+                    نشاط تعليمي
+                </option>
+
+                <option value="ملخص">
+                    ملخص
+                </option>
 
             </select>
 
@@ -365,7 +556,8 @@
     </div>
 
 
-    <!-- الأسئلة -->
+
+    <!-- إعداد الأسئلة -->
     <div class="card">
 
         <h2>إعداد الأسئلة</h2>
@@ -374,27 +566,52 @@
 
             <div class="count-box">
                 <label>اختيار من متعدد</label>
-                <input id="mcq" type="number" min="0" value="5">
+                <input
+                    id="mcq"
+                    type="number"
+                    min="0"
+                    value="5"
+                >
             </div>
 
             <div class="count-box">
                 <label>صح أو خطأ</label>
-                <input id="tf" type="number" min="0" value="5">
+                <input
+                    id="tf"
+                    type="number"
+                    min="0"
+                    value="5"
+                >
             </div>
 
             <div class="count-box">
                 <label>أكمل الفراغ</label>
-                <input id="fill" type="number" min="0" value="5">
+                <input
+                    id="fill"
+                    type="number"
+                    min="0"
+                    value="5"
+                >
             </div>
 
             <div class="count-box">
                 <label>توصيل بالمصطلح</label>
-                <input id="match" type="number" min="0" value="5">
+                <input
+                    id="match"
+                    type="number"
+                    min="0"
+                    value="5"
+                >
             </div>
 
             <div class="count-box">
                 <label>توصيل بالصورة</label>
-                <input id="imageMatch" type="number" min="0" value="0">
+                <input
+                    id="imageMatch"
+                    type="number"
+                    min="0"
+                    value="0"
+                >
             </div>
 
         </div>
@@ -402,43 +619,83 @@
     </div>
 
 
-    <!-- بيانات المعلم -->
+
+    <!-- بيانات المستند -->
     <div class="card">
 
         <h2>بيانات المستند</h2>
 
         <div class="step">
-            <label>اسم المعلم / المعلمة</label>
-            <input id="teacher" type="text">
+
+            <label>
+                اسم المعلم / المعلمة
+            </label>
+
+            <input
+                id="teacher"
+                type="text"
+            >
+
         </div>
 
-        <div class="step">
-            <label>اسم المدرسة</label>
-            <input id="school" type="text">
-        </div>
 
         <div class="step">
-            <label>عنوان المستند</label>
-            <input id="title" type="text" value="مستند تعليمي">
+
+            <label>
+                اسم المدرسة
+            </label>
+
+            <input
+                id="school"
+                type="text"
+            >
+
         </div>
+
+
+        <div class="step">
+
+            <label>
+                عنوان المستند
+            </label>
+
+            <input
+                id="title"
+                type="text"
+                value="مستند تعليمي"
+            >
+
+        </div>
+
 
         <div class="buttons">
 
-            <button class="primary" onclick="generateQuestions()">
+            <button
+                class="primary"
+                onclick="generateQuestions()"
+            >
                 إنشاء الأسئلة
             </button>
 
         </div>
 
-        <div id="loading" class="loading">
+
+        <div
+            id="loading"
+            class="loading"
+        >
             جارٍ إنشاء الأسئلة...
         </div>
 
     </div>
 
 
+
     <!-- المعاينة -->
-    <div id="previewCard" class="card preview">
+    <div
+        id="previewCard"
+        class="card preview"
+    >
 
         <h2>معاينة المستند</h2>
 
@@ -446,15 +703,24 @@
 
         <div class="buttons">
 
-            <button class="success" onclick="exportDocument('pdf')">
+            <button
+                class="success"
+                onclick="exportDocument('pdf')"
+            >
                 تصدير PDF
             </button>
 
-            <button class="success" onclick="exportDocument('docx')">
+            <button
+                class="success"
+                onclick="exportDocument('docx')"
+            >
                 تصدير Word
             </button>
 
-            <button class="warning" onclick="exportDocument('both')">
+            <button
+                class="warning"
+                onclick="exportDocument('both')"
+            >
                 PDF + Word
             </button>
 
@@ -465,6 +731,7 @@
 </div>
 
 
+
 <script>
 
 const curriculumData = {{ data|tojson }};
@@ -472,71 +739,512 @@ const curriculumData = {{ data|tojson }};
 let generatedQuestions = [];
 
 
-/* تحميل الصفوف حسب المرحلة */
-function stageChanged() {
+/* ==========================================
+   أدوات عامة
+========================================== */
 
-    const stage =
-        document.querySelector('input[name="stage"]:checked')?.value;
+function getStage() {
+
+    return document.querySelector(
+        'input[name="stage"]:checked'
+    )?.value || '';
+
+}
+
+
+function isSecondaryTrackGrade(grade) {
+
+    return (
+        grade === 'السنة الثانية' ||
+        grade === 'السنة الثالثة' ||
+        grade === 'ثاني ثانوي' ||
+        grade === 'ثالث ثانوي'
+    );
+
+}
+
+
+function resetLessons(message) {
+
+    document.getElementById('lessonsBox').innerHTML = `
+        <div class="empty">
+            ${message || 'اختر الصف والفصل والمادة لعرض الوحدات والدروس'}
+        </div>
+    `;
+
+}
+
+
+function resetSubject() {
+
+    document.getElementById('subject').innerHTML =
+        '<option value="">اختر المادة</option>';
+
+}
+
+
+function getGradeData() {
 
     const grade =
+        document.getElementById('grade').value;
+
+    if (!grade) {
+        return null;
+    }
+
+    return curriculumData.curriculum?.[grade] || null;
+
+}
+
+
+/* ==========================================
+   تغيير المرحلة
+========================================== */
+
+function stageChanged() {
+
+    const stage = getStage();
+
+    const gradeSelect =
         document.getElementById('grade');
 
-    grade.innerHTML =
+    const track =
+        document.getElementById('track');
+
+    gradeSelect.innerHTML =
         '<option value="">اختر الصف</option>';
 
-    if (!stage) return;
+    track.value = '';
+
+    document.getElementById('trackStep').style.display =
+        'none';
+
+    resetSubject();
+
+    resetLessons(
+        'اختر الصف والفصل والمادة لعرض الوحدات والدروس'
+    );
+
+
+    if (!stage) {
+        return;
+    }
+
 
     const grades =
-        curriculumData.grades[stage] || [];
+        curriculumData.grades?.[stage] || [];
 
-    grades.forEach(g => {
+
+    grades.forEach(gradeName => {
 
         const option =
             document.createElement('option');
 
-        option.value = g;
-        option.textContent = g;
+        option.value = gradeName;
 
-        grade.appendChild(option);
+        option.textContent = gradeName;
+
+        gradeSelect.appendChild(option);
 
     });
 
-    document.getElementById('lessonsBox').innerHTML =
-        '<div class="empty">اختر الصف والفصل والمادة</div>';
 }
 
 
-/* تحميل المواد */
+/* ==========================================
+   تغيير الصف
+========================================== */
+
+function gradeChanged() {
+
+    const stage =
+        getStage();
+
+    const grade =
+        document.getElementById('grade').value;
+
+    const trackStep =
+        document.getElementById('trackStep');
+
+    const track =
+        document.getElementById('track');
+
+
+    track.value = '';
+
+    resetSubject();
+
+    resetLessons(
+        'اختر الفصل والمادة لعرض الوحدات والدروس'
+    );
+
+
+    if (
+        stage === 'ثانوي' &&
+        isSecondaryTrackGrade(grade)
+    ) {
+
+        trackStep.style.display = 'block';
+
+    } else {
+
+        trackStep.style.display = 'none';
+
+    }
+
+
+    loadSubjects();
+
+}
+
+
+/* ==========================================
+   تغيير المسار
+========================================== */
+
+function trackChanged() {
+
+    resetSubject();
+
+    resetLessons(
+        'اختر المادة لعرض الوحدات والدروس'
+    );
+
+    loadSubjects();
+
+}
+
+
+/* ==========================================
+   تغيير الفصل
+========================================== */
+
+function termChanged() {
+
+    resetSubject();
+
+    resetLessons(
+        'اختر المادة لعرض الوحدات والدروس'
+    );
+
+    loadSubjects();
+
+}
+
+
+/* ==========================================
+   تغيير المادة
+========================================== */
+
+function subjectChanged() {
+
+    loadCurriculum();
+
+}
+
+
+/* ==========================================
+   الوصول إلى بيانات المسار
+========================================== */
+
+function getSelectedTrackData() {
+
+    const grade =
+        document.getElementById('grade').value;
+
+    const track =
+        document.getElementById('track').value;
+
+    const gradeData =
+        getGradeData();
+
+
+    if (!gradeData) {
+        return null;
+    }
+
+
+    /*
+      إذا كان curriculum.json مبنياً بالطريقة الجديدة:
+
+      السنة الثانية
+          -> المسار العام
+              -> المواد
+    */
+
+    if (
+        isSecondaryTrackGrade(grade) &&
+        track &&
+        gradeData[track] &&
+        typeof gradeData[track] === 'object'
+    ) {
+
+        return gradeData[track];
+
+    }
+
+
+    /*
+      دعم البنية القديمة أيضاً إذا كانت المواد
+      موجودة مباشرة داخل السنة.
+    */
+
+    return gradeData;
+
+}
+
+
+/* ==========================================
+   تحديد ما إذا كانت المادة تابعة لمسار آخر
+========================================== */
+
+function belongsToAnotherTrack(subjectName, selectedTrack) {
+
+    const trackNames = [
+        'المسار العام',
+        'مسار علوم الحاسب والهندسة',
+        'مسار الصحة والحياة',
+        'مسار إدارة الأعمال',
+        'المسار الشرعي'
+    ];
+
+
+    const mentionedTrack =
+        trackNames.find(trackName =>
+            subjectName.includes(trackName)
+        );
+
+
+    if (!mentionedTrack) {
+        return false;
+    }
+
+
+    return mentionedTrack !== selectedTrack;
+
+}
+
+
+/* ==========================================
+   تنسيق اسم المادة للعرض
+========================================== */
+
+function cleanSubjectName(subjectName) {
+
+    return subjectName
+        .replace(' - مسار علوم الحاسب والهندسة', '')
+        .replace(' - مسار الصحة والحياة', '')
+        .replace(' - مسار إدارة الأعمال', '')
+        .replace(' - المسار الشرعي', '')
+        .replace(' - المسار العام', '')
+        .trim();
+
+}
+
+
+/* ==========================================
+   تحميل المواد
+========================================== */
+
 function loadSubjects() {
 
-    const subject =
+    const stage =
+        getStage();
+
+    const grade =
+        document.getElementById('grade').value;
+
+    const term =
+        document.getElementById('term').value;
+
+    const track =
+        document.getElementById('track').value;
+
+    const subjectSelect =
         document.getElementById('subject');
 
-    subject.innerHTML =
+
+    subjectSelect.innerHTML =
         '<option value="">اختر المادة</option>';
+
+
+    if (!grade) {
+        return;
+    }
+
+
+    /*
+      السنة الثانية والثالثة الثانوية
+      يجب اختيار المسار أولاً.
+    */
+
+    if (
+        stage === 'ثانوي' &&
+        isSecondaryTrackGrade(grade) &&
+        !track
+    ) {
+
+        return;
+
+    }
+
+
+    const subjectData =
+        getSelectedTrackData();
+
+
+    /*
+      الطريقة الأفضل:
+      نستخرج المواد الموجودة فعلياً داخل curriculum.
+    */
+
+    if (
+        subjectData &&
+        typeof subjectData === 'object'
+    ) {
+
+        const subjectNames =
+            Object.keys(subjectData);
+
+
+        subjectNames.forEach(subjectName => {
+
+            /*
+              في حالة استخدام بنية البيانات القديمة،
+              نخفي المواد التي تحمل اسم مسار آخر.
+            */
+
+            if (
+                stage === 'ثانوي' &&
+                isSecondaryTrackGrade(grade) &&
+                track &&
+                belongsToAnotherTrack(subjectName, track)
+            ) {
+
+                return;
+
+            }
+
+
+            const value =
+                subjectName;
+
+            const label =
+                cleanSubjectName(subjectName);
+
+
+            const option =
+                document.createElement('option');
+
+            option.value = value;
+
+            option.textContent = label;
+
+            subjectSelect.appendChild(option);
+
+        });
+
+
+        return;
+
+    }
+
+
+    /*
+      دعم النظام القديم الذي يستخدم
+      curriculumData.subjects
+    */
 
     const subjects =
         curriculumData.subjects || [];
 
-    subjects.forEach(s => {
+
+    subjects.forEach(subjectName => {
 
         const option =
             document.createElement('option');
 
-        option.value = s;
-        option.textContent = s;
+        option.value = subjectName;
 
-        subject.appendChild(option);
+        option.textContent = subjectName;
+
+        subjectSelect.appendChild(option);
 
     });
+
 }
 
 
-/* تحميل الوحدات والدروس */
-function loadCurriculum() {
+/* ==========================================
+   جلب بيانات المادة
+========================================== */
+
+function getSubjectData() {
 
     const grade =
         document.getElementById('grade').value;
+
+    const track =
+        document.getElementById('track').value;
+
+    const subject =
+        document.getElementById('subject').value;
+
+    const gradeData =
+        getGradeData();
+
+
+    if (
+        !gradeData ||
+        !subject
+    ) {
+
+        return null;
+
+    }
+
+
+    /*
+      البنية الجديدة للثانوية:
+      الصف -> المسار -> المادة
+    */
+
+    if (
+        isSecondaryTrackGrade(grade) &&
+        track &&
+        gradeData[track] &&
+        gradeData[track][subject]
+    ) {
+
+        return gradeData[track][subject];
+
+    }
+
+
+    /*
+      البنية القديمة:
+      الصف -> المادة
+    */
+
+    return gradeData[subject] || null;
+
+}
+
+
+/* ==========================================
+   تحميل الوحدات والدروس
+========================================== */
+
+function loadCurriculum() {
+
+    const stage =
+        getStage();
+
+    const grade =
+        document.getElementById('grade').value;
+
+    const track =
+        document.getElementById('track').value;
 
     const term =
         document.getElementById('term').value;
@@ -547,80 +1255,220 @@ function loadCurriculum() {
     const box =
         document.getElementById('lessonsBox');
 
-    if (!grade || !term || !subject) {
 
-        box.innerHTML =
-            '<div class="empty">اختر الصف والفصل والمادة لعرض الوحدات والدروس</div>';
+    if (!grade) {
+
+        resetLessons(
+            'اختر الصف أولاً'
+        );
 
         return;
+
     }
 
 
-    /*
-      في هذه المرحلة لا توجد الوحدات والدروس
-      داخل curriculum.json بعد.
+    if (
+        stage === 'ثانوي' &&
+        isSecondaryTrackGrade(grade) &&
+        !track
+    ) {
 
-      عند إضافتها لاحقاً سيقوم هذا الجزء
-      بعرضها تلقائياً.
-    */
+        resetLessons(
+            'اختر المسار أولاً'
+        );
+
+        return;
+
+    }
+
+
+    if (!term || !subject) {
+
+        resetLessons(
+            'اختر الفصل والمادة لعرض الوحدات والدروس'
+        );
+
+        return;
+
+    }
+
+
+    const subjectData =
+        getSubjectData();
+
+
+    if (!subjectData) {
+
+        resetLessons(
+            'لم تتم إضافة بيانات هذه المادة بعد.'
+        );
+
+        return;
+
+    }
+
 
     const curriculum =
-        curriculumData.curriculum?.[grade]?.[subject]?.[term];
+        subjectData[term];
+
 
     if (!curriculum) {
 
-        box.innerHTML = `
-            <div class="empty">
-                لم تتم إضافة الوحدات والدروس لهذه المادة بعد.
-                <br>
-                سيتم ربطها بالمناهج الرسمية في الخطوة التالية.
-            </div>
-        `;
+        resetLessons(
+            'لم تتم إضافة الوحدات والدروس لهذا الفصل الدراسي بعد.'
+        );
 
         return;
+
     }
 
 
     box.innerHTML = '';
 
 
+    /*
+      أزرار اختيار الكل وإلغاء الكل
+    */
+
+    const tools =
+        document.createElement('div');
+
+    tools.className =
+        'select-tools';
+
+
+    const selectAllButton =
+        document.createElement('button');
+
+    selectAllButton.type =
+        'button';
+
+    selectAllButton.className =
+        'mini-button';
+
+    selectAllButton.textContent =
+        'اختيار جميع الدروس';
+
+    selectAllButton.onclick =
+        function () {
+
+            document
+                .querySelectorAll('.lesson-check')
+                .forEach(item => {
+
+                    item.checked = true;
+
+                });
+
+        };
+
+
+    const clearAllButton =
+        document.createElement('button');
+
+    clearAllButton.type =
+        'button';
+
+    clearAllButton.className =
+        'mini-button';
+
+    clearAllButton.textContent =
+        'إلغاء اختيار الكل';
+
+    clearAllButton.onclick =
+        function () {
+
+            document
+                .querySelectorAll('.lesson-check')
+                .forEach(item => {
+
+                    item.checked = false;
+
+                });
+
+        };
+
+
+    tools.appendChild(selectAllButton);
+
+    tools.appendChild(clearAllButton);
+
+    box.appendChild(tools);
+
+
+    /*
+      عرض الوحدات والدروس
+    */
+
     Object.keys(curriculum).forEach(unitName => {
+
+        const lessons =
+            curriculum[unitName];
+
 
         const unit =
             document.createElement('div');
 
-        unit.className = 'unit';
+        unit.className =
+            'unit';
+
 
         const title =
             document.createElement('div');
 
-        title.className = 'unit-title';
+        title.className =
+            'unit-title';
 
-        title.textContent = unitName;
+        title.textContent =
+            unitName;
+
 
         unit.appendChild(title);
 
 
-        curriculum[unitName].forEach((lesson, index) => {
+        if (Array.isArray(lessons)) {
 
-            const row =
-                document.createElement('label');
+            lessons.forEach(lesson => {
 
-            row.className = 'lesson-item';
+                const row =
+                    document.createElement('label');
 
-            row.innerHTML = `
-                <input
-                    type="checkbox"
-                    class="lesson-check"
-                    value="${lesson}"
-                    data-unit="${unitName}"
-                >
-                <span>${lesson}</span>
-            `;
+                row.className =
+                    'lesson-item';
 
-            unit.appendChild(row);
 
-        });
+                const checkbox =
+                    document.createElement('input');
+
+                checkbox.type =
+                    'checkbox';
+
+                checkbox.className =
+                    'lesson-check';
+
+                checkbox.value =
+                    lesson;
+
+                checkbox.dataset.unit =
+                    unitName;
+
+
+                const text =
+                    document.createElement('span');
+
+                text.textContent =
+                    lesson;
+
+
+                row.appendChild(checkbox);
+
+                row.appendChild(text);
+
+                unit.appendChild(row);
+
+            });
+
+        }
 
 
         box.appendChild(unit);
@@ -630,14 +1478,20 @@ function loadCurriculum() {
 }
 
 
-/* إنشاء الأسئلة */
+/* ==========================================
+   إنشاء الأسئلة
+========================================== */
+
 async function generateQuestions() {
 
     const stage =
-        document.querySelector('input[name="stage"]:checked')?.value || '';
+        getStage();
 
     const grade =
         document.getElementById('grade').value;
+
+    const track =
+        document.getElementById('track').value;
 
     const term =
         document.getElementById('term').value;
@@ -645,79 +1499,192 @@ async function generateQuestions() {
     const subject =
         document.getElementById('subject').value;
 
+    const documentType =
+        document.getElementById('documentType').value;
+
+
+    const selectedLessonElements =
+        [
+            ...document.querySelectorAll(
+                '.lesson-check:checked'
+            )
+        ];
+
 
     const lessons =
-        [...document.querySelectorAll('.lesson-check:checked')]
-        .map(x => x.value);
+        selectedLessonElements.map(
+            item => item.value
+        );
+
+
+    const lessonDetails =
+        selectedLessonElements.map(
+            item => ({
+                lesson: item.value,
+                unit: item.dataset.unit || ''
+            })
+        );
 
 
     const counts = {
 
         mcq:
-            Number(document.getElementById('mcq').value || 0),
+            Math.max(
+                0,
+                Number(
+                    document.getElementById('mcq').value || 0
+                )
+            ),
 
         tf:
-            Number(document.getElementById('tf').value || 0),
+            Math.max(
+                0,
+                Number(
+                    document.getElementById('tf').value || 0
+                )
+            ),
 
         fill:
-            Number(document.getElementById('fill').value || 0),
+            Math.max(
+                0,
+                Number(
+                    document.getElementById('fill').value || 0
+                )
+            ),
 
         match:
-            Number(document.getElementById('match').value || 0),
+            Math.max(
+                0,
+                Number(
+                    document.getElementById('match').value || 0
+                )
+            ),
 
         imageMatch:
-            Number(document.getElementById('imageMatch').value || 0)
+            Math.max(
+                0,
+                Number(
+                    document.getElementById('imageMatch').value || 0
+                )
+            )
 
     };
 
 
-    if (!stage || !grade || !term || !subject) {
+    if (
+        !stage ||
+        !grade ||
+        !term ||
+        !subject
+    ) {
 
-        alert('يرجى اختيار المرحلة والصف والفصل والمادة.');
+        alert(
+            'يرجى اختيار المرحلة والصف والفصل والمادة.'
+        );
 
         return;
+
+    }
+
+
+    if (
+        stage === 'ثانوي' &&
+        isSecondaryTrackGrade(grade) &&
+        !track
+    ) {
+
+        alert(
+            'يرجى اختيار المسار.'
+        );
+
+        return;
+
     }
 
 
     if (lessons.length === 0) {
 
-        alert('يرجى اختيار درس واحد على الأقل.');
+        alert(
+            'يرجى اختيار درس واحد على الأقل.'
+        );
 
         return;
+
     }
 
 
-    document.getElementById('loading').style.display =
+    const totalQuestions =
+        counts.mcq +
+        counts.tf +
+        counts.fill +
+        counts.match +
+        counts.imageMatch;
+
+
+    if (
+        documentType !== 'ملخص' &&
+        totalQuestions === 0
+    ) {
+
+        alert(
+            'يرجى تحديد عدد سؤال واحد على الأقل.'
+        );
+
+        return;
+
+    }
+
+
+    const loading =
+        document.getElementById('loading');
+
+
+    loading.style.display =
         'block';
 
 
     try {
 
         const response =
-            await fetch('/api/generate', {
+            await fetch(
+                '/api/generate',
+                {
+                    method: 'POST',
 
-                method: 'POST',
+                    headers: {
+                        'Content-Type':
+                            'application/json'
+                    },
 
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                    body: JSON.stringify({
 
-                body: JSON.stringify({
+                        stage,
+                        grade,
+                        track,
+                        term,
+                        subject,
+                        documentType,
+                        lessons,
+                        lessonDetails,
+                        counts
 
-                    stage,
-                    grade,
-                    term,
-                    subject,
-                    lessons,
-                    counts
+                    })
+                }
+            );
 
-                })
 
-            });
+        if (!response.ok) {
+
+            throw new Error(
+                'فشل إنشاء الأسئلة'
+            );
+
+        }
 
 
         const data =
             await response.json();
+
 
         generatedQuestions =
             data.questions || [];
@@ -728,29 +1695,40 @@ async function generateQuestions() {
             {
                 stage,
                 grade,
+                track,
                 term,
-                subject
+                subject,
+                documentType
             }
         );
 
 
     } catch (error) {
 
-        alert('حدث خطأ أثناء إنشاء الأسئلة.');
+        alert(
+            'حدث خطأ أثناء إنشاء الأسئلة.'
+        );
 
         console.error(error);
 
+    } finally {
+
+        loading.style.display =
+            'none';
+
     }
-
-
-    document.getElementById('loading').style.display =
-        'none';
 
 }
 
 
-/* عرض المعاينة */
-function showPreview(questions, meta) {
+/* ==========================================
+   عرض المعاينة
+========================================== */
+
+function showPreview(
+    questions,
+    meta
+) {
 
     const card =
         document.getElementById('previewCard');
@@ -759,66 +1737,150 @@ function showPreview(questions, meta) {
         document.getElementById('preview');
 
 
+    const title =
+        document.getElementById('title').value ||
+        'مستند تعليمي';
+
+
     let html = '';
+
 
     html += `
         <h1 style="text-align:center">
-            ${document.getElementById('title').value}
+            ${escapeHtml(title)}
         </h1>
+    `;
 
+
+    html += `
         <p>
-            <strong>المرحلة:</strong> ${meta.stage}
-            &nbsp;&nbsp;
-            <strong>الصف:</strong> ${meta.grade}
-        </p>
+            <strong>المرحلة:</strong>
+            ${escapeHtml(meta.stage)}
 
+            &nbsp;&nbsp;
+
+            <strong>الصف:</strong>
+            ${escapeHtml(meta.grade)}
+        </p>
+    `;
+
+
+    if (meta.track) {
+
+        html += `
+            <p>
+                <strong>المسار:</strong>
+                ${escapeHtml(meta.track)}
+            </p>
+        `;
+
+    }
+
+
+    html += `
         <p>
-            <strong>المادة:</strong> ${meta.subject}
-            &nbsp;&nbsp;
-            <strong>${meta.term}</strong>
-        </p>
 
+            <strong>المادة:</strong>
+            ${escapeHtml(
+                cleanSubjectName(meta.subject)
+            )}
+
+            &nbsp;&nbsp;
+
+            <strong>
+                ${escapeHtml(meta.term)}
+            </strong>
+
+        </p>
+    `;
+
+
+    html += `
+        <p>
+            <strong>نوع المستند:</strong>
+            ${escapeHtml(meta.documentType)}
+        </p>
+    `;
+
+
+    html += `
         <div class="student-line">
-            اسم الطالب/ـة: ________________________________
+            اسم الطالب/ـة:
+            ________________________________
         </div>
     `;
 
 
-    questions.forEach(q => {
+    if (!questions.length) {
 
         html += `
-            <div class="question">
-
-                <div class="question-text">
-                    ${q.n}. ${q.text}
-                </div>
+            <div class="empty">
+                لم يتم إنشاء أسئلة.
+            </div>
         `;
 
+    }
 
-        if (q.options) {
 
-            html += `<div class="options">`;
+    questions.forEach(
+        (q, index) => {
 
-            q.options.forEach(option => {
+            const number =
+                q.n || index + 1;
+
+            html += `
+                <div class="question">
+
+                    <div class="question-text">
+
+                        ${number}.
+                        ${escapeHtml(q.text || '')}
+
+                    </div>
+            `;
+
+
+            if (
+                Array.isArray(q.options) &&
+                q.options.length
+            ) {
 
                 html += `
-                    <div>${option}</div>
+                    <div class="options">
                 `;
 
-            });
 
-            html += `</div>`;
+                q.options.forEach(
+                    option => {
+
+                        html += `
+                            <div>
+                                ${escapeHtml(option)}
+                            </div>
+                        `;
+
+                    }
+                );
+
+
+                html += `
+                    </div>
+                `;
+
+            }
+
+
+            html += `
+                </div>
+            `;
 
         }
-
-
-        html += `</div>`;
-
-    });
+    );
 
 
     preview.innerHTML =
         html;
+
 
     card.style.display =
         'block';
@@ -831,15 +1893,41 @@ function showPreview(questions, meta) {
 }
 
 
-/* التصدير */
+/* ==========================================
+   حماية النصوص داخل المعاينة
+========================================== */
+
+function escapeHtml(value) {
+
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+
+}
+
+
+/* ==========================================
+   التصدير
+========================================== */
+
 async function exportDocument(format) {
 
     if (!generatedQuestions.length) {
 
-        alert('قم بإنشاء الأسئلة أولاً.');
+        alert(
+            'قم بإنشاء الأسئلة أولاً.'
+        );
 
         return;
+
     }
+
+
+    const track =
+        document.getElementById('track').value;
 
 
     const meta = {
@@ -847,13 +1935,17 @@ async function exportDocument(format) {
         title:
             document.getElementById('title').value,
 
+        documentType:
+            document.getElementById('documentType').value,
+
         stage:
-            document.querySelector(
-                'input[name="stage"]:checked'
-            )?.value || '',
+            getStage(),
 
         grade:
             document.getElementById('grade').value,
+
+        track:
+            track,
 
         term:
             document.getElementById('term').value,
@@ -870,60 +1962,111 @@ async function exportDocument(format) {
     };
 
 
-    const response =
-        await fetch('/api/export', {
+    try {
 
-            method: 'POST',
+        const response =
+            await fetch(
+                '/api/export',
+                {
+                    method: 'POST',
 
-            headers: {
-                'Content-Type': 'application/json'
-            },
+                    headers: {
+                        'Content-Type':
+                            'application/json'
+                    },
 
-            body: JSON.stringify({
+                    body: JSON.stringify({
 
-                questions:
-                    generatedQuestions,
+                        questions:
+                            generatedQuestions,
 
-                meta,
+                        meta,
 
-                format
+                        format
 
-            })
+                    })
+                }
+            );
 
-        });
+
+        if (!response.ok) {
+
+            throw new Error(
+                'فشل تصدير المستند'
+            );
+
+        }
 
 
-    const blob =
-        await response.blob();
+        const blob =
+            await response.blob();
 
-    const url =
-        window.URL.createObjectURL(blob);
 
-    const a =
-        document.createElement('a');
+        const url =
+            window.URL.createObjectURL(
+                blob
+            );
 
-    a.href = url;
 
-    a.download =
-        format === 'docx'
-            ? 'المستند.docx'
-            : format === 'pdf'
-                ? 'المستند.pdf'
-                : 'المستندات.zip';
+        const a =
+            document.createElement('a');
 
-    document.body.appendChild(a);
 
-    a.click();
+        a.href =
+            url;
 
-    a.remove();
 
-    window.URL.revokeObjectURL(url);
+        a.download =
+            format === 'docx'
+                ? 'المستند.docx'
+                : format === 'pdf'
+                    ? 'المستند.pdf'
+                    : 'المستندات.zip';
+
+
+        document.body.appendChild(a);
+
+
+        a.click();
+
+
+        a.remove();
+
+
+        window.URL.revokeObjectURL(
+            url
+        );
+
+
+    } catch (error) {
+
+        alert(
+            'حدث خطأ أثناء تصدير المستند.'
+        );
+
+        console.error(error);
+
+    }
 
 }
 
 
-/* تشغيل المواد عند فتح الصفحة */
-loadSubjects();
+/* ==========================================
+   التشغيل عند فتح الصفحة
+========================================== */
+
+document.addEventListener(
+    'DOMContentLoaded',
+    function () {
+
+        resetSubject();
+
+        resetLessons(
+            'اختر المرحلة والصف والفصل والمادة لعرض الوحدات والدروس'
+        );
+
+    }
+);
 
 </script>
 
