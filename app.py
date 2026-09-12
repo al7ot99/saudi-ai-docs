@@ -2,445 +2,565 @@ import io
 import json
 import os
 import zipfile
+from pathlib import Path
+from typing import List
 
-from flask import Flask, render_template, request, jsonify, send_file
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
+from flask import Flask, jsonify, render_template, request, send_file
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Pt
+from openai import OpenAI
+from pydantic import BaseModel, Field
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+import arabic_reshaper
+from bidi.algorithm import get_display
+
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA = BASE_DIR / "data" / "curriculum.json"
 
 app = Flask(__name__)
 
-# مسار المشروع
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(BASE_DIR, "data", "curriculum.json")
+# النموذج الافتراضي: سريع وتكلفته مناسبة لتوليد عدد كبير من الأسئلة.
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-5.6-luna")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
 
 
+# -----------------------------
+# تحميل بيانات المناهج
+# -----------------------------
 def curriculum():
-    with open(DATA, encoding="utf8") as f:
+    with open(DATA, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-# =========================================================
-# توليد الأسئلة
-# =========================================================
+# -----------------------------
+# نماذج المخرجات المنظمة من الذكاء الاصطناعي
+# -----------------------------
+class AIQuestion(BaseModel):
+    type: str = Field(description="نوع السؤال بالعربية")
+    lesson: str = Field(description="اسم الدرس الذي بُني عليه السؤال")
+    text: str = Field(description="نص السؤال")
+    options: List[str] = Field(default_factory=list, description="الخيارات إن وجدت")
+    answer: str = Field(default="", description="الإجابة الصحيحة")
+    explanation: str = Field(default="", description="تفسير مختصر للإجابة")
 
-def generate_questions(p):
-    counts = p.get("counts", {})
-    lessons = p.get("lessons", [])
 
-    if not lessons:
-        lessons = ["الدرس المحدد"]
+class AIQuestionSet(BaseModel):
+    questions: List[AIQuestion]
 
-    questions = []
-    number = 1
 
-    types = [
-        ("mcq", "اختيار من متعدد"),
-        ("tf", "صح أو خطأ"),
-        ("fill", "أكمل الفراغ"),
-        ("match", "صل الكلمة بالمصطلح المناسب"),
-        ("imageMatch", "صل الكلمة بالصورة المناسبة")
-    ]
+# -----------------------------
+# أدوات مساعدة
+# -----------------------------
+TYPE_LABELS = {
+    "mcq": "اختيار من متعدد",
+    "tf": "صح أو خطأ",
+    "fill": "أكمل الفراغ",
+    "match": "توصيل الكلمة بالمصطلح المناسب",
+    "imageMatch": "توصيل الكلمة بالصورة المناسبة",
+}
 
-    for key, label in types:
 
-        amount = int(counts.get(key, 0))
+def int_count(value):
+    try:
+        return max(0, min(50, int(value or 0)))
+    except Exception:
+        return 0
 
-        for _ in range(amount):
 
-            lesson = lessons[(number - 1) % len(lessons)]
+def total_requested(counts):
+    return sum(int_count(counts.get(k, 0)) for k in TYPE_LABELS)
+
+
+def normalize_lessons(payload):
+    lessons = payload.get("lessons") or []
+    clean = []
+    for x in lessons:
+        if isinstance(x, str) and x.strip():
+            clean.append(x.strip())
+    return clean
+
+
+def selected_curriculum_context(payload):
+    """
+    يحاول إحضار الوحدة المرتبطة بكل درس مختار من curriculum.json
+    حتى يكون توليد الأسئلة أدق.
+    """
+    grade = payload.get("grade", "")
+    subject = payload.get("subject", "")
+    term = payload.get("term", "")
+    track = payload.get("track", "")
+    lessons = set(normalize_lessons(payload))
+
+    if not grade or not subject or not term:
+        return []
+
+    data = curriculum().get("curriculum", {})
+    grade_data = data.get(grade, {})
+
+    # السنة الثانية والثالثة قد تكون داخل مسار.
+    if track and isinstance(grade_data, dict) and track in grade_data:
+        grade_data = grade_data.get(track, {})
+
+    subject_data = grade_data.get(subject, {}) if isinstance(grade_data, dict) else {}
+    term_data = subject_data.get(term, {}) if isinstance(subject_data, dict) else {}
+
+    result = []
+    if isinstance(term_data, dict):
+        for unit_name, unit_lessons in term_data.items():
+            if not isinstance(unit_lessons, list):
+                continue
+            selected = [l for l in unit_lessons if l in lessons]
+            if selected:
+                result.append({
+                    "unit": unit_name,
+                    "lessons": selected,
+                })
+    return result
+
+
+def build_generation_prompt(payload):
+    counts = payload.get("counts") or {}
+    lessons = normalize_lessons(payload)
+    lesson_details = payload.get("lessonDetails") or selected_curriculum_context(payload)
+
+    stage = payload.get("stage", "")
+    grade = payload.get("grade", "")
+    track = payload.get("track", "")
+    subject = payload.get("subject", "")
+    term = payload.get("term", "")
+    document_type = payload.get("documentType", "اختبار")
+    difficulty = payload.get("difficulty", "متوسط")
+
+    requested = []
+    for key, label in TYPE_LABELS.items():
+        n = int_count(counts.get(key, 0))
+        if n:
+            requested.append(f"- {label}: {n}")
+
+    context_text = json.dumps(lesson_details, ensure_ascii=False, indent=2) if lesson_details else json.dumps(lessons, ensure_ascii=False)
+
+    return f"""
+أنت معلم خبير في المناهج السعودية. أنشئ أسئلة تعليمية دقيقة ومناسبة للمرحلة والصف والمادة المحددة.
+
+بيانات الطلب:
+- المرحلة: {stage}
+- الصف: {grade}
+- المسار: {track or "لا يوجد"}
+- المادة: {subject}
+- الفصل الدراسي: {term}
+- نوع المستند: {document_type}
+- مستوى الصعوبة: {difficulty}
+
+الدروس والوحدات المختارة:
+{context_text}
+
+عدد الأسئلة المطلوبة حسب النوع:
+{chr(10).join(requested)}
+
+قواعد إلزامية:
+1) أنشئ العدد المطلوب بالضبط دون زيادة أو نقص.
+2) وزع الأسئلة على الدروس المختارة قدر الإمكان، ولا تخرج عن موضوعها.
+3) اجعل صياغة السؤال مناسبة لعمر الطالب والصف الدراسي.
+4) في الاختيار من متعدد:
+   - أعطِ 4 خيارات فقط.
+   - خيار واحد صحيح بوضوح.
+   - اجعل الخيارات متقاربة ومعقولة.
+5) في صح أو خطأ:
+   - اجعل العبارة تعليمية واضحة.
+   - answer يجب أن يكون "صح" أو "خطأ".
+6) في أكمل الفراغ:
+   - ضع فراغًا واضحًا داخل الجملة.
+   - answer يحتوي الكلمة أو العبارة المطلوبة.
+7) في التوصيل:
+   - ضع عناصر التوصيل داخل options بصورة واضحة، مثل:
+     "1) المصطلح الأول  —  أ) التعريف"
+8) في توصيل الكلمة بالصورة:
+   - لا تنشئ روابط صور.
+   - اجعل options أوصافًا قصيرة لصور تعليمية يمكن إضافتها لاحقًا.
+9) لا تستخدم أسئلة وهمية مثل "اختر الإجابة الصحيحة عن الدرس"؛ يجب أن يكون لكل سؤال محتوى حقيقي.
+10) لا تذكر أنك نموذج ذكاء اصطناعي.
+11) إذا كانت المادة لغة إنجليزية، اجعل السؤال باللغة المناسبة لمحتوى الكتاب، ويمكن أن يكون الشرح بالعربية عند الحاجة.
+12) explanation مختصر جدًا ومفيد للمعلم.
+"""
+
+
+def fallback_questions(payload):
+    """
+    وضع احتياطي حتى لا يتعطل الموقع إذا لم تتم إضافة مفتاح API بعد.
+    الأسئلة هنا تجريبية فقط، ويظهر ذلك في رسالة API.
+    """
+    counts = payload.get("counts") or {}
+    lessons = normalize_lessons(payload) or ["الدرس المحدد"]
+    out = []
+    n = 1
+
+    for key, label in TYPE_LABELS.items():
+        for _ in range(int_count(counts.get(key, 0))):
+            lesson = lessons[(n - 1) % len(lessons)]
 
             if key == "mcq":
-                text = f"اختر الإجابة الصحيحة وفق محتوى «{lesson}»."
-
-                options = [
-                    "أ) الإجابة الأولى",
-                    "ب) الإجابة الثانية",
-                    "ج) الإجابة الثالثة",
-                    "د) الإجابة الرابعة"
-                ]
-
+                text = f"اختر الإجابة الصحيحة المرتبطة بمفهوم رئيس في درس «{lesson}»."
+                options = ["أ) الخيار الأول", "ب) الخيار الثاني", "ج) الخيار الثالث", "د) الخيار الرابع"]
+                answer = ""
             elif key == "tf":
-                text = f"صح أم خطأ: العبارة التالية مرتبطة بمحتوى «{lesson}»."
-                options = ["☐ صح", "☐ خطأ"]
-
-            elif key == "fill":
-                text = f"أكمل الفراغ من محتوى «{lesson}»: ____________________."
+                text = f"صح أم خطأ: اكتب حكم العبارة المتعلقة بدرس «{lesson}»."
                 options = []
-
+                answer = ""
+            elif key == "fill":
+                text = f"أكمل الفراغ بمعلومة صحيحة من درس «{lesson}»: __________."
+                options = []
+                answer = ""
             elif key == "match":
-                text = f"صل عناصر «{lesson}» بالمصطلحات المناسبة."
-
-                options = [
-                    "(1) __________________    (أ) __________________",
-                    "(2) __________________    (ب) __________________"
-                ]
-
+                text = f"صل بين عناصر درس «{lesson}» وما يناسبها."
+                options = ["1) __________   أ) __________", "2) __________   ب) __________"]
+                answer = ""
             else:
-                text = f"صل الكلمة بالصورة المناسبة من محتوى «{lesson}»."
+                text = f"صل الكلمة بوصف الصورة المناسبة من درس «{lesson}»."
+                options = ["1) __________   أ) [وصف صورة]", "2) __________   ب) [وصف صورة]"]
+                answer = ""
 
-                options = [
-                    "① صورة    ② صورة    ③ صورة"
-                ]
-
-            questions.append({
-                "n": number,
+            out.append({
+                "n": n,
                 "type": label,
                 "lesson": lesson,
                 "text": text,
-                "options": options
+                "options": options,
+                "answer": answer,
+                "explanation": "",
             })
+            n += 1
 
-            number += 1
-
-    return questions
+    return out
 
 
-# =========================================================
-# الصفحة الرئيسية
-# =========================================================
+def ai_generate_questions(payload):
+    counts = payload.get("counts") or {}
+    total = total_requested(counts)
 
-@app.get("/")
-def home():
-    return render_template(
-        "index.html",
-        data=curriculum()
+    if total <= 0:
+        raise ValueError("اختر عدداً واحداً على الأقل من الأسئلة.")
+    if total > 50:
+        raise ValueError("الحد الأقصى في عملية توليد واحدة هو 50 سؤالاً.")
+    if not normalize_lessons(payload):
+        raise ValueError("اختر درساً واحداً على الأقل.")
+
+    if not OPENAI_API_KEY:
+        return fallback_questions(payload), False, "لم تتم إضافة OPENAI_API_KEY بعد؛ تم استخدام الوضع التجريبي."
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+    prompt = build_generation_prompt(payload)
+
+    response = client.responses.parse(
+        model=OPENAI_MODEL,
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "أنت معلم خبير في بناء الاختبارات وفق المناهج السعودية. "
+                    "التزم بدقة بالصف والمادة والدروس المختارة، ولا تختلق معلومات خارجها."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        text_format=AIQuestionSet,
     )
 
+    parsed = response.output_parsed
+    if not parsed or not parsed.questions:
+        raise RuntimeError("لم يرجع النموذج أسئلة صالحة.")
 
-# =========================================================
-# توليد الأسئلة
-# =========================================================
+    questions = []
+    for i, q in enumerate(parsed.questions[:total], start=1):
+        questions.append({
+            "n": i,
+            "type": q.type,
+            "lesson": q.lesson,
+            "text": q.text,
+            "options": q.options or [],
+            "answer": q.answer or "",
+            "explanation": q.explanation or "",
+        })
 
-@app.post("/api/generate")
-def generate():
+    # إذا رجع عددًا أقل لأي سبب، نعد المحاولة خطأ بدل عرض مستند ناقص.
+    if len(questions) != total:
+        raise RuntimeError(f"تم توليد {len(questions)} سؤالاً فقط من أصل {total}. أعد المحاولة.")
 
-    data = request.get_json()
+    return questions, True, f"تم التوليد بالذكاء الاصطناعي باستخدام {OPENAI_MODEL}."
 
+
+# -----------------------------
+# Routes
+# -----------------------------
+@app.get("/")
+def home():
+    return render_template("index.html", data=curriculum())
+
+
+@app.get("/api/health")
+def health():
     return jsonify({
         "ok": True,
-        "questions": generate_questions(data)
+        "ai_enabled": bool(OPENAI_API_KEY),
+        "model": OPENAI_MODEL if OPENAI_API_KEY else None,
     })
 
 
-# =========================================================
-# إنشاء Word
-# =========================================================
+@app.post("/api/generate")
+def gen():
+    try:
+        payload = request.get_json(force=True) or {}
+        questions, ai_used, message = ai_generate_questions(payload)
+        return jsonify({
+            "ok": True,
+            "questions": questions,
+            "ai_used": ai_used,
+            "message": message,
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+        }), 400
 
-def docx_bytes(questions, meta):
 
-    document = Document()
+# -----------------------------
+# Word
+# -----------------------------
+def set_rtl(paragraph):
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    pPr = paragraph._p.get_or_add_pPr()
+    bidi = OxmlElement("w:bidi")
+    bidi.set(qn("w:val"), "1")
+    pPr.append(bidi)
 
-    normal = document.styles["Normal"]
-    normal.font.name = "Arial"
-    normal.font.size = Pt(12)
 
-    # العنوان
-    paragraph = document.add_paragraph()
-    paragraph.alignment = 1
+def add_docx_line(doc, text="", bold=False, size=12, center=False):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER if center else WD_ALIGN_PARAGRAPH.RIGHT
+    if not center:
+        set_rtl(p)
+    r = p.add_run(str(text))
+    r.bold = bold
+    r.font.name = "Arial"
+    r.font.size = Pt(size)
+    return p
 
-    run = paragraph.add_run(
-        meta.get("title", "مستند تعليمي")
-    )
 
-    run.bold = True
-    run.font.size = Pt(18)
+def docx_bytes(qs, meta):
+    d = Document()
+    d.styles["Normal"].font.name = "Arial"
+    d.styles["Normal"].font.size = Pt(12)
 
-    # بيانات الاختبار
-    info = [
-        ("المرحلة", "stage"),
-        ("الصف", "grade"),
-        ("المادة", "subject"),
-        ("الفصل الدراسي", "term"),
-        ("الوحدة", "unit"),
-        ("المعلم", "teacher"),
-        ("المدرسة", "school")
-    ]
+    title = meta.get("title") or meta.get("documentType") or "مستند تعليمي"
+    add_docx_line(d, title, bold=True, size=18, center=True)
 
-    for label, key in info:
-
-        if meta.get(key):
-
-            p = document.add_paragraph()
-
-            r = p.add_run(
-                f"{label}: {meta.get(key)}"
-            )
-
-            r.font.size = Pt(11)
-
-    # اسم الطالب
-    p = document.add_paragraph()
-
-    r = p.add_run(
-        "اسم الطالب: __________________________________________"
-    )
-
+    # اسم الطالب أولاً حسب المطلوب
+    p = d.add_paragraph()
+    set_rtl(p)
+    r = p.add_run("اسم الطالب/ـة: ______________________________")
     r.bold = True
+    r.font.name = "Arial"
+    r.font.size = Pt(12)
 
-    document.add_paragraph("")
+    info_items = [
+        ("المرحلة", meta.get("stage")),
+        ("الصف", meta.get("grade")),
+        ("المسار", meta.get("track")),
+        ("المادة", meta.get("subject")),
+        ("الفصل الدراسي", meta.get("term")),
+        ("نوع المستند", meta.get("documentType")),
+        ("المعلم/ـة", meta.get("teacher")),
+        ("المدرسة", meta.get("school")),
+    ]
+    for label, value in info_items:
+        if value:
+            add_docx_line(d, f"{label}: {value}", size=11)
 
-    # الأسئلة
-    for q in questions:
+    d.add_paragraph("")
 
-        p = document.add_paragraph()
+    for q in qs:
+        add_docx_line(d, f"{q.get('n', '')}. {q.get('text', '')}", bold=True)
 
-        r = p.add_run(
-            f"{q['n']}. {q['text']}"
-        )
+        opts = q.get("options") or []
+        if opts:
+            # خيارات الاختيار من متعدد في سطر واحد
+            if q.get("type") == "اختيار من متعدد" and len(opts) <= 4:
+                add_docx_line(d, "     ".join(opts), size=11)
+            else:
+                for x in opts:
+                    add_docx_line(d, x, size=11)
 
-        r.bold = True
+        d.add_paragraph("")
 
-        # الاختيارات في نفس السطر
-        if q.get("type") == "اختيار من متعدد":
-
-            p = document.add_paragraph()
-
-            options = q.get("options", [])
-
-            r = p.add_run(
-                "     ".join(options)
-            )
-
-        elif q.get("type") == "صح أو خطأ":
-
-            p = document.add_paragraph()
-
-            p.add_run(
-                "☐ صح                 ☐ خطأ"
-            )
-
-        elif q.get("options"):
-
-            for option in q["options"]:
-
-                p = document.add_paragraph()
-
-                p.add_run(option)
-
-    output = io.BytesIO()
-
-    document.save(output)
-
-    return output.getvalue()
+    b = io.BytesIO()
+    d.save(b)
+    b.seek(0)
+    return b.getvalue()
 
 
-# =========================================================
-# إنشاء PDF
-# =========================================================
+# -----------------------------
+# PDF عربي
+# -----------------------------
+def find_arabic_font():
+    candidates = [
+        BASE_DIR / "static" / "fonts" / "DejaVuSans.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf"),
+        Path("/usr/share/fonts/opentype/noto/NotoNaskhArabic-Regular.ttf"),
+    ]
+    for p in candidates:
+        if p.exists():
+            return str(p)
+    return None
 
-def pdf_bytes(questions, meta):
 
-    output = io.BytesIO()
+ARABIC_FONT_PATH = find_arabic_font()
+PDF_FONT = "Helvetica"
 
-    pdf = canvas.Canvas(
-        output,
-        pagesize=A4
-    )
+if ARABIC_FONT_PATH:
+    try:
+        pdfmetrics.registerFont(TTFont("ArabicFont", ARABIC_FONT_PATH))
+        PDF_FONT = "ArabicFont"
+    except Exception:
+        PDF_FONT = "Helvetica"
 
-    width, height = A4
 
-    y = height - 45
+def ar(text):
+    text = str(text or "")
+    if PDF_FONT == "Helvetica":
+        return text
+    return get_display(arabic_reshaper.reshape(text))
 
-    # العنوان
-    pdf.setFont(
-        "Helvetica-Bold",
-        16
-    )
 
-    pdf.drawRightString(
-        width - 40,
-        y,
-        meta.get("title", "مستند تعليمي")
-    )
+def wrap_text(text, max_chars=85):
+    text = str(text or "")
+    words = text.split()
+    lines, current = [], []
+    length = 0
 
-    y -= 30
+    for word in words:
+        extra = len(word) + (1 if current else 0)
+        if length + extra > max_chars and current:
+            lines.append(" ".join(current))
+            current = [word]
+            length = len(word)
+        else:
+            current.append(word)
+            length += extra
 
-    pdf.setFont(
-        "Helvetica",
-        10
-    )
+    if current:
+        lines.append(" ".join(current))
+    return lines or [""]
 
-    info = [
-        ("المرحلة", "stage"),
-        ("الصف", "grade"),
-        ("المادة", "subject"),
-        ("الفصل الدراسي", "term"),
-        ("الوحدة", "unit"),
-        ("المعلم", "teacher"),
-        ("المدرسة", "school")
+
+def pdf_bytes(qs, meta):
+    b = io.BytesIO()
+    c = canvas.Canvas(b, pagesize=A4)
+    w, h = A4
+    y = h - 45
+
+    def new_page():
+        nonlocal y
+        c.showPage()
+        y = h - 45
+        c.setFont(PDF_FONT, 11)
+
+    def draw_right(text, font_size=11, gap=16):
+        nonlocal y
+        c.setFont(PDF_FONT, font_size)
+        for line in wrap_text(text):
+            if y < 50:
+                new_page()
+                c.setFont(PDF_FONT, font_size)
+            c.drawRightString(w - 40, y, ar(line))
+            y -= gap
+
+    title = meta.get("title") or meta.get("documentType") or "مستند تعليمي"
+    draw_right(title, 17, 22)
+    draw_right("اسم الطالب/ـة: ______________________________", 11, 18)
+
+    info_items = [
+        ("المرحلة", meta.get("stage")),
+        ("الصف", meta.get("grade")),
+        ("المسار", meta.get("track")),
+        ("المادة", meta.get("subject")),
+        ("الفصل الدراسي", meta.get("term")),
+        ("نوع المستند", meta.get("documentType")),
+        ("المعلم/ـة", meta.get("teacher")),
+        ("المدرسة", meta.get("school")),
     ]
 
-    for label, key in info:
+    for label, value in info_items:
+        if value:
+            draw_right(f"{label}: {value}", 10, 15)
 
-        if meta.get(key):
+    y -= 8
 
-            pdf.drawRightString(
-                width - 40,
-                y,
-                f"{label}: {meta.get(key)}"
-            )
+    for q in qs:
+        draw_right(f"{q.get('n', '')}. {q.get('text', '')}", 11, 17)
+        opts = q.get("options") or []
 
-            y -= 15
-
-    # اسم الطالب
-    y -= 5
-
-    pdf.setFont(
-        "Helvetica-Bold",
-        11
-    )
-
-    pdf.drawRightString(
-        width - 40,
-        y,
-        "اسم الطالب: __________________________________________"
-    )
-
-    y -= 25
-
-    pdf.setFont(
-        "Helvetica",
-        10
-    )
-
-    # الأسئلة
-    for q in questions:
-
-        lines = [
-            f"{q['n']}. {q['text']}"
-        ]
-
-        if q.get("type") == "اختيار من متعدد":
-
-            lines.append(
-                "     ".join(q.get("options", []))
-            )
-
-        elif q.get("type") == "صح أو خطأ":
-
-            lines.append(
-                "☐ صح                 ☐ خطأ"
-            )
-
-        else:
-
-            lines.extend(
-                q.get("options", [])
-            )
-
-        for line in lines:
-
-            if y < 45:
-
-                pdf.showPage()
-
-                y = height - 45
-
-                pdf.setFont(
-                    "Helvetica",
-                    10
-                )
-
-            pdf.drawRightString(
-                width - 40,
-                y,
-                line[:115]
-            )
-
-            y -= 16
-
+        if opts:
+            if q.get("type") == "اختيار من متعدد" and len(opts) <= 4:
+                draw_right("     ".join(opts), 9, 15)
+            else:
+                for x in opts:
+                    draw_right(x, 9, 14)
         y -= 7
 
-    pdf.save()
+    c.save()
+    b.seek(0)
+    return b.getvalue()
 
-    return output.getvalue()
-
-
-# =========================================================
-# التصدير
-# =========================================================
 
 @app.post("/api/export")
 def export():
+    try:
+        p = request.get_json(force=True) or {}
+        qs = p.get("questions") or []
+        meta = p.get("meta") or {}
+        fmt = (p.get("format") or "pdf").lower()
 
-    data = request.get_json()
-
-    questions = data["questions"]
-    meta = data["meta"]
-    fmt = data["format"]
-
-    if fmt == "pdf":
-
-        return send_file(
-            io.BytesIO(
-                pdf_bytes(
-                    questions,
-                    meta
-                )
-            ),
-            as_attachment=True,
-            download_name="المستند.pdf",
-            mimetype="application/pdf"
-        )
-
-    if fmt == "docx":
-
-        return send_file(
-            io.BytesIO(
-                docx_bytes(
-                    questions,
-                    meta
-                )
-            ),
-            as_attachment=True,
-            download_name="المستند.docx",
-            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-
-    # PDF + Word
-    output = io.BytesIO()
-
-    with zipfile.ZipFile(
-        output,
-        "w",
-        zipfile.ZIP_DEFLATED
-    ) as archive:
-
-        archive.writestr(
-            "المستند.pdf",
-            pdf_bytes(
-                questions,
-                meta
+        if fmt == "pdf":
+            return send_file(
+                io.BytesIO(pdf_bytes(qs, meta)),
+                as_attachment=True,
+                download_name="المستند.pdf",
+                mimetype="application/pdf",
             )
-        )
 
-        archive.writestr(
-            "المستند.docx",
-            docx_bytes(
-                questions,
-                meta
+        if fmt == "docx":
+            return send_file(
+                io.BytesIO(docx_bytes(qs, meta)),
+                as_attachment=True,
+                download_name="المستند.docx",
+                mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
+
+        z = io.BytesIO()
+        with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as f:
+            f.writestr("المستند.pdf", pdf_bytes(qs, meta))
+            f.writestr("المستند.docx", docx_bytes(qs, meta))
+
+        z.seek(0)
+        return send_file(
+            z,
+            as_attachment=True,
+            download_name="المستندات.zip",
+            mimetype="application/zip",
         )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
-    output.seek(0)
-
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name="المستندات.zip",
-        mimetype="application/zip"
-    )
-
-
-# =========================================================
-# تشغيل الموقع
-# =========================================================
 
 if __name__ == "__main__":
-
-    app.run(
-        host="0.0.0.0",
-        port=5000
-    )
+    port = int(os.environ.get("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)
