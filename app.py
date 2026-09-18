@@ -28,7 +28,6 @@ TYPE_LABELS = {
     "mcq": "اختيار من متعدد",
     "tf": "صح أو خطأ",
     "fill": "أكمل الفراغ",
-    "match": "توصيل الكلمة بالمصطلح المناسب",
 }
 DIFFICULTY_LABELS = {"easy": "سهل", "medium": "متوسط", "hard": "صعب"}
 
@@ -118,30 +117,31 @@ def eligible_questions(payload, difficulty):
     return selected
 
 
-def balanced_pick(pool, count, lessons, used_ids):
+def balanced_pick(pool, count, lessons, types, used_ids):
+    """يوزع الاختيار بالتناوب على الدروس وأنواع الأسئلة قدر الإمكان."""
     if count <= 0:
         return []
-    by_lesson = {lesson: [] for lesson in lessons}
+    buckets = {(lesson, qtype): [] for lesson in lessons for qtype in types}
     for q in pool:
         qid = str(q.get("id") or "")
         if qid and qid in used_ids:
             continue
-        lesson = q.get("lesson")
-        if lesson in by_lesson:
-            by_lesson[lesson].append(q)
-    for values in by_lesson.values():
+        key = (q.get("lesson"), q.get("type"))
+        if key in buckets:
+            buckets[key].append(q)
+    for values in buckets.values():
         random.shuffle(values)
 
     result = []
-    active = list(lessons)
-    random.shuffle(active)
+    keys = list(buckets.keys())
+    random.shuffle(keys)
     while len(result) < count:
         progressed = False
-        for lesson in active:
+        for key in keys:
             if len(result) >= count:
                 break
-            if by_lesson.get(lesson):
-                q = by_lesson[lesson].pop()
+            if buckets[key]:
+                q = buckets[key].pop()
                 result.append(q)
                 qid = str(q.get("id") or "")
                 if qid:
@@ -174,7 +174,7 @@ def generate_from_bank(payload):
     shortages = []
     for difficulty, count in requested.items():
         pool = eligible_questions(payload, difficulty)
-        chosen = balanced_pick(pool, count, lessons, used_ids)
+        chosen = balanced_pick(pool, count, lessons, types, used_ids)
         picked.extend(chosen)
         if len(chosen) < count:
             shortages.append(
@@ -187,13 +187,17 @@ def generate_from_bank(payload):
             + " | ".join(shortages)
         )
 
-    random.shuffle(picked)
+    # ترتيب ثابت حسب نوع السؤال: اختيار من متعدد، صح/خطأ، أكمل.
+    type_order = {"mcq": 0, "tf": 1, "fill": 2}
+    picked.sort(key=lambda q: (type_order.get(q.get("type"), 99), q.get("lesson", ""), q.get("id", "")))
     questions = []
     for i, q in enumerate(picked, start=1):
         qtype = q.get("type", "")
         options = q.get("options") or []
         if qtype == "mcq":
             options = [strip_option_prefix(x) for x in options][:4]
+        elif qtype == "fill":
+            options = [strip_option_prefix(x) for x in options][:3]
         questions.append({
             "n": i,
             "id": q.get("id", ""),
@@ -262,16 +266,29 @@ def docx_bytes(qs, meta):
     add_docx_line(d, info, bold=True, size=11)
     add_docx_line(d, "اسم الطالب/ـة: ______________________________", bold=True)
     d.add_paragraph("")
-    for q in qs:
-        add_docx_line(d, f"{q.get('n', '')}. {q.get('text', '')}", bold=True)
-        opts = q.get("options") or []
-        if opts:
-            if q.get("type") == "اختيار من متعدد" or q.get("typeKey") == "mcq":
-                add_docx_line(d, "     ".join(numbered_mcq_options(opts)), size=11)
-            else:
-                for x in opts:
-                    add_docx_line(d, x, size=11)
-        d.add_paragraph("")
+    section_titles = {
+        "mcq": "اختر الإجابة الصحيحة من بين الخيارات التالية:",
+        "tf": "ضع علامة (✓) أمام العبارة الصحيحة وعلامة (✗) أمام العبارة الخاطئة:",
+        "fill": "أكمل الفراغ باختيار الكلمة المناسبة:",
+    }
+    groups = [(k, [q for q in qs if q.get("typeKey") == k]) for k in ("mcq", "tf", "fill")]
+    section_no = 0
+    for qtype, items in groups:
+        if not items:
+            continue
+        section_no += 1
+        add_docx_line(d, f"السؤال {section_no}: {section_titles[qtype]}", bold=True, size=13)
+        for i, q in enumerate(items, start=1):
+            text = q.get("text", "")
+            if qtype == "tf":
+                text = f"{text}  (      )"
+            add_docx_line(d, f"{i}. {text}", bold=True)
+            opts = q.get("options") or []
+            if qtype == "mcq":
+                add_docx_line(d, "     ".join(numbered_mcq_options(opts[:4])), size=11)
+            elif qtype == "fill":
+                add_docx_line(d, "     ".join(f"{j}. {strip_option_prefix(x)}" for j, x in enumerate(opts[:3], start=1)), size=11)
+            d.add_paragraph("")
     b = io.BytesIO()
     d.save(b)
     b.seek(0)
@@ -354,16 +371,30 @@ def pdf_bytes(qs, meta):
     draw_right(info, 10, 17)
     draw_right("اسم الطالب/ـة: ______________________________", 11, 19)
     y -= 8
-    for q in qs:
-        draw_right(f"{q.get('n', '')}. {q.get('text', '')}", 11, 17)
-        opts = q.get("options") or []
-        if opts:
-            if q.get("type") == "اختيار من متعدد" or q.get("typeKey") == "mcq":
-                draw_right("     ".join(numbered_mcq_options(opts)), 9, 15)
-            else:
-                for x in opts:
-                    draw_right(x, 9, 14)
-        y -= 7
+    section_titles = {
+        "mcq": "اختر الإجابة الصحيحة من بين الخيارات التالية:",
+        "tf": "ضع علامة (✓) أمام العبارة الصحيحة وعلامة (✗) أمام العبارة الخاطئة:",
+        "fill": "أكمل الفراغ باختيار الكلمة المناسبة:",
+    }
+    groups = [(k, [q for q in qs if q.get("typeKey") == k]) for k in ("mcq", "tf", "fill")]
+    section_no = 0
+    for qtype, items in groups:
+        if not items:
+            continue
+        section_no += 1
+        draw_right(f"السؤال {section_no}: {section_titles[qtype]}", 12, 19)
+        for i, q in enumerate(items, start=1):
+            text = q.get("text", "")
+            if qtype == "tf":
+                text = f"{text}  (      )"
+            draw_right(f"{i}. {text}", 11, 17)
+            opts = q.get("options") or []
+            if qtype == "mcq":
+                draw_right("     ".join(numbered_mcq_options(opts[:4])), 9, 15)
+            elif qtype == "fill":
+                fill_opts = [f"{j}. {strip_option_prefix(x)}" for j, x in enumerate(opts[:3], start=1)]
+                draw_right("     ".join(fill_opts), 9, 15)
+            y -= 7
     c.save()
     b.seek(0)
     return b.getvalue()
