@@ -17,16 +17,17 @@ app = Flask(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-QUESTIONS_FILE = os.path.join(
+CURRICULUM_FILE = os.path.join(
     BASE_DIR,
     "data",
-    "questions.json"
+    "curriculum.json"
 )
 
 QUESTIONS_FILE = os.path.join(
     BASE_DIR,
     "data",
-    "questions_bank_allstages_v389_launch_candidate.json"
+    "questions.json"
+)
 )
 
 
