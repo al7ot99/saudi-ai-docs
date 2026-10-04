@@ -5,14 +5,14 @@ import random
 
 
 # ============================================================
-# FLASK APP
+# CREATE FLASK APP
 # ============================================================
 
 app = Flask(__name__)
 
 
 # ============================================================
-# FILE PATHS
+# BASE PATHS
 # ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +28,6 @@ QUESTIONS_FILE = os.path.join(
     "data",
     "questions.json"
 )
-)
 
 
 # ============================================================
@@ -41,15 +40,15 @@ def load_curriculum():
             data = json.load(file)
 
         print("Curriculum loaded successfully")
-
         return data
 
     except FileNotFoundError:
-        print("WARNING: curriculum.json not found")
+        print("ERROR: curriculum.json not found")
+        print(CURRICULUM_FILE)
         return {}
 
     except json.JSONDecodeError as error:
-        print("ERROR: curriculum.json is not valid JSON")
+        print("ERROR: curriculum.json contains invalid JSON")
         print(error)
         return {}
 
@@ -83,12 +82,12 @@ def load_questions_bank():
         return questions
 
     except FileNotFoundError:
-        print("ERROR: Questions bank file not found")
+        print("ERROR: questions.json not found")
         print(QUESTIONS_FILE)
         return []
 
     except json.JSONDecodeError as error:
-        print("ERROR: Questions bank JSON is invalid")
+        print("ERROR: questions.json contains invalid JSON")
         print(error)
         return []
 
@@ -99,7 +98,7 @@ def load_questions_bank():
 
 
 # ============================================================
-# LOAD DATA
+# LOAD DATA ON START
 # ============================================================
 
 curriculum_data = load_curriculum()
@@ -120,6 +119,7 @@ def clean_value(value):
 def safe_int(value, default=0):
     try:
         return int(value)
+
     except (TypeError, ValueError):
         return default
 
@@ -146,7 +146,7 @@ def get_first_value(data, names, default=None):
 
 
 # ============================================================
-# FILTER QUESTIONS
+# QUESTION FILTER
 # ============================================================
 
 def get_questions(
@@ -231,6 +231,7 @@ def index():
 
 @app.route("/health")
 def health():
+
     return jsonify({
         "status": "ok",
         "questions_count": len(questions_bank)
@@ -238,7 +239,7 @@ def health():
 
 
 # ============================================================
-# QUESTIONS BANK TEST
+# TEST QUESTIONS BANK
 # ============================================================
 
 @app.route("/test-questions")
@@ -252,7 +253,7 @@ def test_questions():
 
 
 # ============================================================
-# BANK STATISTICS
+# BANK STATS
 # ============================================================
 
 @app.route("/api/stats")
@@ -278,7 +279,7 @@ def api_stats():
 
 
 # ============================================================
-# STAGES
+# GET STAGES
 # ============================================================
 
 @app.route("/api/stages")
@@ -301,7 +302,7 @@ def api_stages():
 
 
 # ============================================================
-# GRADES
+# GET GRADES
 # ============================================================
 
 @app.route("/api/grades")
@@ -334,7 +335,7 @@ def api_grades():
 
 
 # ============================================================
-# TERMS
+# GET TERMS
 # ============================================================
 
 @app.route("/api/terms")
@@ -377,7 +378,7 @@ def api_terms():
 
 
 # ============================================================
-# SUBJECTS
+# GET SUBJECTS
 # ============================================================
 
 @app.route("/api/subjects")
@@ -430,7 +431,7 @@ def api_subjects():
 
 
 # ============================================================
-# UNITS
+# GET UNITS
 # ============================================================
 
 @app.route("/api/units")
@@ -493,7 +494,7 @@ def api_units():
 
 
 # ============================================================
-# LESSONS
+# GET LESSONS
 # ============================================================
 
 @app.route("/api/lessons")
@@ -578,6 +579,7 @@ def api_questions():
 
     if request.method == "POST":
         data = get_request_data()
+
     else:
         data = request.args
 
@@ -679,9 +681,6 @@ def api_questions():
 
 # ============================================================
 # GENERATE TEST
-#
-# Multiple routes are supported so the old interface can
-# continue working.
 # ============================================================
 
 @app.route(
@@ -779,7 +778,6 @@ def generate_test():
         )
 
         if not lessons:
-
             lessons = request.form.getlist(
                 "lesson"
             )
@@ -827,8 +825,6 @@ def generate_test():
         )
     )
 
-    # Default question numbers if the old interface
-    # does not send counts.
     if (
         mcq_count == 0
         and tf_count == 0
@@ -981,7 +977,7 @@ def question_by_id(question_id):
 
 
 # ============================================================
-# ROUTES TEST
+# SHOW ROUTES
 # ============================================================
 
 @app.route("/routes")
@@ -1002,7 +998,7 @@ def routes():
 
 
 # ============================================================
-# 404
+# 404 HANDLER
 # ============================================================
 
 @app.errorhandler(404)
@@ -1015,7 +1011,7 @@ def not_found(error):
 
 
 # ============================================================
-# 500
+# 500 HANDLER
 # ============================================================
 
 @app.errorhandler(500)
@@ -1033,7 +1029,7 @@ def server_error(error):
 
 
 # ============================================================
-# START APP
+# RUN APP
 # ============================================================
 
 if __name__ == "__main__":
