@@ -5,17 +5,22 @@ import random
 
 
 # ============================================================
-# CREATE FLASK APP
+# FLASK APP
 # ============================================================
 
 app = Flask(__name__)
 
 
 # ============================================================
-# BASE PATHS
+# BASE PATH
 # ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# ============================================================
+# CURRICULUM FILE
+# ============================================================
 
 CURRICULUM_FILE = os.path.join(
     BASE_DIR,
@@ -23,11 +28,19 @@ CURRICULUM_FILE = os.path.join(
     "curriculum.json"
 )
 
-QUESTIONS_FILE = os.path.join(
-    BASE_DIR,
-    "data",
-    "questions.json"
-)
+
+# ============================================================
+# QUESTIONS FILES
+# ============================================================
+
+QUESTIONS_FILES = [
+    os.path.join(
+        BASE_DIR,
+        "data",
+        f"questions_part_{i:02d}.json"
+    )
+    for i in range(1, 11)
+]
 
 
 # ============================================================
@@ -35,73 +48,128 @@ QUESTIONS_FILE = os.path.join(
 # ============================================================
 
 def load_curriculum():
+
     try:
-        with open(CURRICULUM_FILE, "r", encoding="utf-8") as file:
+
+        with open(
+            CURRICULUM_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+
             data = json.load(file)
 
         print("Curriculum loaded successfully")
+
         return data
 
     except FileNotFoundError:
+
         print("ERROR: curriculum.json not found")
         print(CURRICULUM_FILE)
+
         return {}
 
     except json.JSONDecodeError as error:
-        print("ERROR: curriculum.json contains invalid JSON")
+
+        print("ERROR: curriculum.json invalid JSON")
         print(error)
+
         return {}
 
     except Exception as error:
+
         print("ERROR while loading curriculum")
         print(error)
+
         return {}
 
 
 # ============================================================
-# LOAD QUESTIONS BANK
+# LOAD ALL QUESTIONS FILES
 # ============================================================
 
 def load_questions_bank():
-    try:
-        with open(QUESTIONS_FILE, "r", encoding="utf-8") as file:
-            data = json.load(file)
 
-        if isinstance(data, dict):
-            questions = data.get("questions", [])
+    all_questions = []
 
-        elif isinstance(data, list):
-            questions = data
+    for questions_file in QUESTIONS_FILES:
 
-        else:
-            questions = []
+        try:
 
-        print("Questions bank loaded successfully")
-        print("Questions count:", len(questions))
+            with open(
+                questions_file,
+                "r",
+                encoding="utf-8"
+            ) as file:
 
-        return questions
+                data = json.load(file)
 
-    except FileNotFoundError:
-        print("ERROR: questions.json not found")
-        print(QUESTIONS_FILE)
-        return []
+            if isinstance(data, dict):
 
-    except json.JSONDecodeError as error:
-        print("ERROR: questions.json contains invalid JSON")
-        print(error)
-        return []
+                questions = data.get(
+                    "questions",
+                    []
+                )
 
-    except Exception as error:
-        print("ERROR while loading questions bank")
-        print(error)
-        return []
+            elif isinstance(data, list):
+
+                questions = data
+
+            else:
+
+                questions = []
+
+            all_questions.extend(
+                questions
+            )
+
+            print(
+                "Loaded:",
+                os.path.basename(questions_file),
+                "Questions:",
+                len(questions)
+            )
+
+        except FileNotFoundError:
+
+            print(
+                "ERROR: file not found:",
+                questions_file
+            )
+
+        except json.JSONDecodeError as error:
+
+            print(
+                "ERROR: invalid JSON:",
+                questions_file
+            )
+
+            print(error)
+
+        except Exception as error:
+
+            print(
+                "ERROR while loading:",
+                questions_file
+            )
+
+            print(error)
+
+    print(
+        "Total questions loaded:",
+        len(all_questions)
+    )
+
+    return all_questions
 
 
 # ============================================================
-# LOAD DATA ON START
+# LOAD DATA
 # ============================================================
 
 curriculum_data = load_curriculum()
+
 questions_bank = load_questions_bank()
 
 
@@ -110,6 +178,7 @@ questions_bank = load_questions_bank()
 # ============================================================
 
 def clean_value(value):
+
     if value is None:
         return ""
 
@@ -117,36 +186,55 @@ def clean_value(value):
 
 
 def safe_int(value, default=0):
+
     try:
+
         return int(value)
 
     except (TypeError, ValueError):
+
         return default
 
 
 def get_request_data():
+
     if request.is_json:
-        return request.get_json(silent=True) or {}
+
+        return request.get_json(
+            silent=True
+        ) or {}
 
     return request.form
 
 
-def get_first_value(data, names, default=None):
+def get_first_value(
+    data,
+    names,
+    default=None
+):
+
     for name in names:
+
         try:
+
             value = data.get(name)
 
-            if value is not None and value != "":
+            if (
+                value is not None
+                and value != ""
+            ):
+
                 return value
 
         except Exception:
+
             pass
 
     return default
 
 
 # ============================================================
-# QUESTION FILTER
+# FILTER QUESTIONS
 # ============================================================
 
 def get_questions(
@@ -161,9 +249,14 @@ def get_questions(
 ):
 
     if lessons is None:
+
         lessons = []
 
-    if isinstance(lessons, str):
+    if isinstance(
+        lessons,
+        str
+    ):
+
         lessons = [lessons]
 
     cleaned_lessons = [
@@ -177,38 +270,76 @@ def get_questions(
     for question in questions_bank:
 
         if stage:
-            if clean_value(question.get("stage")) != clean_value(stage):
+
+            if clean_value(
+                question.get("stage")
+            ) != clean_value(stage):
+
                 continue
 
         if grade:
-            if clean_value(question.get("grade")) != clean_value(grade):
+
+            if clean_value(
+                question.get("grade")
+            ) != clean_value(grade):
+
                 continue
 
         if term:
-            if clean_value(question.get("term")) != clean_value(term):
+
+            if clean_value(
+                question.get("term")
+            ) != clean_value(term):
+
                 continue
 
         if subject:
-            if clean_value(question.get("subject")) != clean_value(subject):
+
+            if clean_value(
+                question.get("subject")
+            ) != clean_value(subject):
+
                 continue
 
         if unit:
-            if clean_value(question.get("unit")) != clean_value(unit):
+
+            if clean_value(
+                question.get("unit")
+            ) != clean_value(unit):
+
                 continue
 
         if cleaned_lessons:
-            if clean_value(question.get("lesson")) not in cleaned_lessons:
+
+            if clean_value(
+                question.get("lesson")
+            ) not in cleaned_lessons:
+
                 continue
 
         if question_type:
-            if clean_value(question.get("type")) != clean_value(question_type):
+
+            if clean_value(
+                question.get("type")
+            ) != clean_value(
+                question_type
+            ):
+
                 continue
 
         if difficulty:
-            if clean_value(question.get("difficulty")) != clean_value(difficulty):
+
+            if clean_value(
+                question.get("difficulty")
+            ) != clean_value(
+                difficulty
+            ):
+
                 continue
 
-        results.append(question)
+        results.append(
+            question
+        )
 
     return results
 
@@ -219,6 +350,7 @@ def get_questions(
 
 @app.route("/")
 def index():
+
     return render_template(
         "index.html",
         data=curriculum_data
@@ -234,12 +366,14 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "questions_count": len(questions_bank)
+        "questions_count": len(
+            questions_bank
+        )
     })
 
 
 # ============================================================
-# TEST QUESTIONS BANK
+# QUESTIONS TEST
 # ============================================================
 
 @app.route("/test-questions")
@@ -247,7 +381,9 @@ def test_questions():
 
     return jsonify({
         "status": "ok",
-        "total_questions": len(questions_bank),
+        "total_questions": len(
+            questions_bank
+        ),
         "sample": questions_bank[:5]
     })
 
@@ -268,12 +404,18 @@ def api_stats():
         )
 
         if not stage:
+
             stage = "unknown"
 
-        stages[stage] = stages.get(stage, 0) + 1
+        stages[stage] = (
+            stages.get(stage, 0) + 1
+        )
 
     return jsonify({
-        "total_questions": len(questions_bank),
+        "status": "ok",
+        "total_questions": len(
+            questions_bank
+        ),
         "stages": stages
     })
 
@@ -286,6 +428,7 @@ def api_stats():
 def api_stages():
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -294,8 +437,13 @@ def api_stages():
             question.get("stage")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
@@ -314,6 +462,7 @@ def api_grades():
     )
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -321,14 +470,20 @@ def api_grades():
         if clean_value(
             question.get("stage")
         ) != clean_value(stage):
+
             continue
 
         value = clean_value(
             question.get("grade")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
@@ -352,6 +507,7 @@ def api_terms():
     )
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -359,19 +515,26 @@ def api_terms():
         if clean_value(
             question.get("stage")
         ) != clean_value(stage):
+
             continue
 
         if clean_value(
             question.get("grade")
         ) != clean_value(grade):
+
             continue
 
         value = clean_value(
             question.get("term")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
@@ -400,6 +563,7 @@ def api_subjects():
     )
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -407,24 +571,32 @@ def api_subjects():
         if clean_value(
             question.get("stage")
         ) != clean_value(stage):
+
             continue
 
         if clean_value(
             question.get("grade")
         ) != clean_value(grade):
+
             continue
 
         if clean_value(
             question.get("term")
         ) != clean_value(term):
+
             continue
 
         value = clean_value(
             question.get("subject")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
@@ -458,6 +630,7 @@ def api_units():
     )
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -465,29 +638,38 @@ def api_units():
         if clean_value(
             question.get("stage")
         ) != clean_value(stage):
+
             continue
 
         if clean_value(
             question.get("grade")
         ) != clean_value(grade):
+
             continue
 
         if clean_value(
             question.get("term")
         ) != clean_value(term):
+
             continue
 
         if clean_value(
             question.get("subject")
         ) != clean_value(subject):
+
             continue
 
         value = clean_value(
             question.get("unit")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
@@ -526,6 +708,7 @@ def api_lessons():
     )
 
     values = []
+
     seen = set()
 
     for question in questions_bank:
@@ -533,54 +716,70 @@ def api_lessons():
         if clean_value(
             question.get("stage")
         ) != clean_value(stage):
+
             continue
 
         if clean_value(
             question.get("grade")
         ) != clean_value(grade):
+
             continue
 
         if clean_value(
             question.get("term")
         ) != clean_value(term):
+
             continue
 
         if clean_value(
             question.get("subject")
         ) != clean_value(subject):
+
             continue
 
         if unit:
+
             if clean_value(
                 question.get("unit")
             ) != clean_value(unit):
+
                 continue
 
         value = clean_value(
             question.get("lesson")
         )
 
-        if value and value not in seen:
+        if (
+            value
+            and value not in seen
+        ):
+
             seen.add(value)
+
             values.append(value)
 
     return jsonify(values)
 
 
 # ============================================================
-# QUESTIONS PREVIEW
+# PREVIEW QUESTIONS
 # ============================================================
 
 @app.route(
     "/api/questions",
-    methods=["GET", "POST"]
+    methods=[
+        "GET",
+        "POST"
+    ]
 )
 def api_questions():
 
     if request.method == "POST":
+
         data = get_request_data()
 
     else:
+
         data = request.args
 
     stage = get_first_value(
@@ -595,7 +794,10 @@ def api_questions():
 
     term = get_first_value(
         data,
-        ["term", "semester"]
+        [
+            "term",
+            "semester"
+        ]
     )
 
     subject = get_first_value(
@@ -615,7 +817,10 @@ def api_questions():
 
     question_type = get_first_value(
         data,
-        ["type", "question_type"]
+        [
+            "type",
+            "question_type"
+        ]
     )
 
     lessons = []
@@ -627,6 +832,7 @@ def api_questions():
         )
 
         if not lessons:
+
             lessons = request.args.getlist(
                 "lessons"
             )
@@ -638,7 +844,11 @@ def api_questions():
             []
         )
 
-        if isinstance(lessons, str):
+        if isinstance(
+            lessons,
+            str
+        ):
+
             lessons = [lessons]
 
         if not lessons:
@@ -648,6 +858,7 @@ def api_questions():
             )
 
             if lesson:
+
                 lessons = [lesson]
 
     else:
@@ -657,6 +868,7 @@ def api_questions():
         )
 
         if not lessons:
+
             lessons = request.form.getlist(
                 "lesson"
             )
@@ -738,16 +950,12 @@ def generate_test():
 
     subject = get_first_value(
         data,
-        [
-            "subject"
-        ]
+        ["subject"]
     )
 
     unit = get_first_value(
         data,
-        [
-            "unit"
-        ]
+        ["unit"]
     )
 
     lessons = []
@@ -759,7 +967,11 @@ def generate_test():
             []
         )
 
-        if isinstance(lessons, str):
+        if isinstance(
+            lessons,
+            str
+        ):
+
             lessons = [lessons]
 
         if not lessons:
@@ -769,6 +981,7 @@ def generate_test():
             )
 
             if lesson:
+
                 lessons = [lesson]
 
     else:
@@ -778,6 +991,7 @@ def generate_test():
         )
 
         if not lessons:
+
             lessons = request.form.getlist(
                 "lesson"
             )
@@ -789,6 +1003,7 @@ def generate_test():
             )
 
             if lesson:
+
                 lessons = [lesson]
 
     mcq_count = safe_int(
@@ -825,44 +1040,66 @@ def generate_test():
         )
     )
 
+
+    # ========================================================
+    # DEFAULT COUNTS
+    # ========================================================
+
     if (
         mcq_count == 0
         and tf_count == 0
         and fill_count == 0
     ):
+
         mcq_count = 5
+
         tf_count = 5
+
         fill_count = 5
 
+
+    # ========================================================
+    # VALIDATION
+    # ========================================================
+
     if not stage:
+
         return jsonify({
             "status": "error",
             "message": "يرجى اختيار المرحلة التعليمية"
         }), 400
 
+
     if not grade:
+
         return jsonify({
             "status": "error",
             "message": "يرجى اختيار الصف"
         }), 400
 
+
     if not term:
+
         return jsonify({
             "status": "error",
             "message": "يرجى اختيار الفصل الدراسي"
         }), 400
 
+
     if not subject:
+
         return jsonify({
             "status": "error",
             "message": "يرجى اختيار المادة"
         }), 400
 
+
     selected_questions = []
 
-    # --------------------------------------------------------
-    # MULTIPLE CHOICE
-    # --------------------------------------------------------
+
+    # ========================================================
+    # MCQ
+    # ========================================================
 
     if mcq_count > 0:
 
@@ -876,15 +1113,18 @@ def generate_test():
             question_type="mcq"
         )
 
-        random.shuffle(available)
+        random.shuffle(
+            available
+        )
 
         selected_questions.extend(
             available[:mcq_count]
         )
 
-    # --------------------------------------------------------
-    # TRUE / FALSE
-    # --------------------------------------------------------
+
+    # ========================================================
+    # TRUE FALSE
+    # ========================================================
 
     if tf_count > 0:
 
@@ -898,15 +1138,18 @@ def generate_test():
             question_type="tf"
         )
 
-        random.shuffle(available)
+        random.shuffle(
+            available
+        )
 
         selected_questions.extend(
             available[:tf_count]
         )
 
-    # --------------------------------------------------------
+
+    # ========================================================
     # FILL
-    # --------------------------------------------------------
+    # ========================================================
 
     if fill_count > 0:
 
@@ -920,11 +1163,18 @@ def generate_test():
             question_type="fill"
         )
 
-        random.shuffle(available)
+        random.shuffle(
+            available
+        )
 
         selected_questions.extend(
             available[:fill_count]
         )
+
+
+    # ========================================================
+    # NO QUESTIONS FOUND
+    # ========================================================
 
     if not selected_questions:
 
@@ -941,14 +1191,18 @@ def generate_test():
             }
         }), 404
 
+
     random.shuffle(
         selected_questions
     )
 
+
     return jsonify({
         "status": "success",
         "message": "تم إنشاء الاختبار بنجاح",
-        "count": len(selected_questions),
+        "count": len(
+            selected_questions
+        ),
         "questions": selected_questions
     })
 
@@ -960,15 +1214,21 @@ def generate_test():
 @app.route(
     "/api/question/<question_id>"
 )
-def question_by_id(question_id):
+def question_by_id(
+    question_id
+):
 
     for question in questions_bank:
 
         if str(
             question.get("id")
-        ) == str(question_id):
+        ) == str(
+            question_id
+        ):
 
-            return jsonify(question)
+            return jsonify(
+                question
+            )
 
     return jsonify({
         "status": "error",
@@ -990,19 +1250,25 @@ def routes():
         result.append({
             "route": str(rule),
             "methods": sorted(
-                list(rule.methods)
+                list(
+                    rule.methods
+                )
             )
         })
 
-    return jsonify(result)
+    return jsonify(
+        result
+    )
 
 
 # ============================================================
-# 404 HANDLER
+# 404
 # ============================================================
 
 @app.errorhandler(404)
-def not_found(error):
+def not_found(
+    error
+):
 
     return jsonify({
         "status": "error",
@@ -1011,11 +1277,13 @@ def not_found(error):
 
 
 # ============================================================
-# 500 HANDLER
+# 500
 # ============================================================
 
 @app.errorhandler(500)
-def server_error(error):
+def server_error(
+    error
+):
 
     print(
         "Internal server error:",
