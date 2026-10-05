@@ -1,42 +1,65 @@
-from flask import Flask, render_template, request, jsonify
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    send_file
+)
+
 import json
 import os
 import random
+import io
+import zipfile
+
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_SECTION
+
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+    PageBreak
+)
 
 
 # ============================================================
-# FLASK APP
+# APP
 # ============================================================
 
 app = Flask(__name__)
 
 
 # ============================================================
-# BASE PATH
+# PATHS
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(
+    os.path.abspath(__file__)
+)
 
-
-# ============================================================
-# CURRICULUM FILE
-# ============================================================
+DATA_DIR = os.path.join(
+    BASE_DIR,
+    "data"
+)
 
 CURRICULUM_FILE = os.path.join(
-    BASE_DIR,
-    "data",
+    DATA_DIR,
     "curriculum.json"
 )
 
-
-# ============================================================
-# QUESTIONS FILES
-# ============================================================
-
 QUESTIONS_FILES = [
     os.path.join(
-        BASE_DIR,
-        "data",
+        DATA_DIR,
         f"questions_part_{i:02d}.json"
     )
     for i in range(1, 11)
@@ -57,48 +80,32 @@ def load_curriculum():
             encoding="utf-8"
         ) as file:
 
-            data = json.load(file)
-
-        print("Curriculum loaded successfully")
-
-        return data
-
-    except FileNotFoundError:
-
-        print("ERROR: curriculum.json not found")
-        print(CURRICULUM_FILE)
-
-        return {}
-
-    except json.JSONDecodeError as error:
-
-        print("ERROR: curriculum.json invalid JSON")
-        print(error)
-
-        return {}
+            return json.load(file)
 
     except Exception as error:
 
-        print("ERROR while loading curriculum")
-        print(error)
+        print(
+            "Curriculum load error:",
+            error
+        )
 
         return {}
 
 
 # ============================================================
-# LOAD ALL QUESTIONS FILES
+# LOAD QUESTIONS
 # ============================================================
 
 def load_questions_bank():
 
     all_questions = []
 
-    for questions_file in QUESTIONS_FILES:
+    for file_path in QUESTIONS_FILES:
 
         try:
 
             with open(
-                questions_file,
+                file_path,
                 "r",
                 encoding="utf-8"
             ) as file:
@@ -126,47 +133,32 @@ def load_questions_bank():
 
             print(
                 "Loaded:",
-                os.path.basename(questions_file),
-                "Questions:",
+                os.path.basename(file_path),
                 len(questions)
             )
 
         except FileNotFoundError:
 
             print(
-                "ERROR: file not found:",
-                questions_file
+                "Missing:",
+                file_path
             )
-
-        except json.JSONDecodeError as error:
-
-            print(
-                "ERROR: invalid JSON:",
-                questions_file
-            )
-
-            print(error)
 
         except Exception as error:
 
             print(
-                "ERROR while loading:",
-                questions_file
+                "Load error:",
+                file_path,
+                error
             )
 
-            print(error)
-
     print(
-        "Total questions loaded:",
+        "TOTAL QUESTIONS:",
         len(all_questions)
     )
 
     return all_questions
 
-
-# ============================================================
-# LOAD DATA
-# ============================================================
 
 curriculum_data = load_curriculum()
 
@@ -177,175 +169,276 @@ questions_bank = load_questions_bank()
 # HELPERS
 # ============================================================
 
-def clean_value(value):
+def clean(value):
 
     if value is None:
+
         return ""
 
     return str(value).strip()
 
 
-def safe_int(value, default=0):
+def clean_subject_name(subject):
 
-    try:
+    value = clean(subject)
 
-        return int(value)
-
-    except (TypeError, ValueError):
-
-        return default
-
-
-def get_request_data():
-
-    if request.is_json:
-
-        return request.get_json(
-            silent=True
-        ) or {}
-
-    return request.form
-
-
-def get_first_value(
-    data,
-    names,
-    default=None
-):
-
-    for name in names:
-
-        try:
-
-            value = data.get(name)
-
-            if (
-                value is not None
-                and value != ""
-            ):
-
-                return value
-
-        except Exception:
-
-            pass
-
-    return default
-
-
-# ============================================================
-# FILTER QUESTIONS
-# ============================================================
-
-def get_questions(
-    stage=None,
-    grade=None,
-    term=None,
-    subject=None,
-    unit=None,
-    lessons=None,
-    question_type=None,
-    difficulty=None
-):
-
-    if lessons is None:
-
-        lessons = []
-
-    if isinstance(
-        lessons,
-        str
-    ):
-
-        lessons = [lessons]
-
-    cleaned_lessons = [
-        clean_value(item)
-        for item in lessons
-        if clean_value(item)
+    suffixes = [
+        " - مسار علوم الحاسب والهندسة",
+        " - مسار الصحة والحياة",
+        " - مسار إدارة الأعمال",
+        " - المسار الشرعي",
+        " - المسار العام"
     ]
 
-    results = []
+    for suffix in suffixes:
+
+        value = value.replace(
+            suffix,
+            ""
+        )
+
+    return value.strip()
+
+
+def normalize_track(track):
+
+    value = clean(track)
+
+    if value == "المسار العام":
+
+        return ""
+
+    return value
+
+
+def question_matches(
+    question,
+    stage,
+    grade,
+    term,
+    subject,
+    lessons,
+    track=""
+):
+
+    if clean(
+        question.get("stage")
+    ) != clean(stage):
+
+        return False
+
+    if clean(
+        question.get("grade")
+    ) != clean(grade):
+
+        return False
+
+    if clean(
+        question.get("term")
+    ) != clean(term):
+
+        return False
+
+    q_subject = clean_subject_name(
+        question.get("subject")
+    )
+
+    wanted_subject = clean_subject_name(
+        subject
+    )
+
+    if q_subject != wanted_subject:
+
+        return False
+
+    if lessons:
+
+        if clean(
+            question.get("lesson")
+        ) not in lessons:
+
+            return False
+
+    wanted_track = normalize_track(
+        track
+    )
+
+    q_track = normalize_track(
+        question.get("track")
+    )
+
+    # إذا كان السؤال محدد المسار
+    # نتأكد من التطابق.
+    # أما الحقول القديمة الفارغة فنسمح بها.
+    if wanted_track and q_track:
+
+        if wanted_track != q_track:
+
+            return False
+
+    return True
+
+
+# ============================================================
+# RANDOM SELECTION WITHOUT DUPLICATES
+# ============================================================
+
+def select_questions(
+    stage,
+    grade,
+    term,
+    subject,
+    lessons,
+    types,
+    difficulties,
+    track=""
+):
+
+    lesson_values = [
+        clean(x)
+        for x in lessons
+        if clean(x)
+    ]
+
+    selected_types = [
+        clean(x)
+        for x in types
+        if clean(x)
+    ]
+
+    base_pool = []
 
     for question in questions_bank:
 
-        if stage:
+        if not question_matches(
+            question,
+            stage,
+            grade,
+            term,
+            subject,
+            lesson_values,
+            track
+        ):
 
-            if clean_value(
-                question.get("stage")
-            ) != clean_value(stage):
+            continue
 
-                continue
+        if clean(
+            question.get("type")
+        ) not in selected_types:
 
-        if grade:
+            continue
 
-            if clean_value(
-                question.get("grade")
-            ) != clean_value(grade):
-
-                continue
-
-        if term:
-
-            if clean_value(
-                question.get("term")
-            ) != clean_value(term):
-
-                continue
-
-        if subject:
-
-            if clean_value(
-                question.get("subject")
-            ) != clean_value(subject):
-
-                continue
-
-        if unit:
-
-            if clean_value(
-                question.get("unit")
-            ) != clean_value(unit):
-
-                continue
-
-        if cleaned_lessons:
-
-            if clean_value(
-                question.get("lesson")
-            ) not in cleaned_lessons:
-
-                continue
-
-        if question_type:
-
-            if clean_value(
-                question.get("type")
-            ) != clean_value(
-                question_type
-            ):
-
-                continue
-
-        if difficulty:
-
-            if clean_value(
-                question.get("difficulty")
-            ) != clean_value(
-                difficulty
-            ):
-
-                continue
-
-        results.append(
+        base_pool.append(
             question
         )
 
-    return results
+    selected = []
+
+    used_ids = set()
+
+
+    # ========================================================
+    # PICK BY DIFFICULTY
+    # ========================================================
+
+    for difficulty in [
+        "easy",
+        "medium",
+        "hard"
+    ]:
+
+        wanted = int(
+            difficulties.get(
+                difficulty,
+                0
+            ) or 0
+        )
+
+        if wanted <= 0:
+
+            continue
+
+        pool = [
+            q
+            for q in base_pool
+            if clean(
+                q.get("difficulty")
+            ) == difficulty
+            and q.get("id") not in used_ids
+        ]
+
+        random.shuffle(pool)
+
+        chosen = pool[:wanted]
+
+        for question in chosen:
+
+            used_ids.add(
+                question.get("id")
+            )
+
+            selected.append(
+                question
+            )
+
+
+    # ========================================================
+    # FILL SHORTAGE
+    # ========================================================
+
+    requested_total = sum(
+        int(
+            difficulties.get(
+                x,
+                0
+            ) or 0
+        )
+        for x in [
+            "easy",
+            "medium",
+            "hard"
+        ]
+    )
+
+    if len(selected) < requested_total:
+
+        shortage = (
+            requested_total
+            - len(selected)
+        )
+
+        extra_pool = [
+            q
+            for q in base_pool
+            if q.get("id")
+            not in used_ids
+        ]
+
+        random.shuffle(
+            extra_pool
+        )
+
+        for question in extra_pool[
+            :shortage
+        ]:
+
+            used_ids.add(
+                question.get("id")
+            )
+
+            selected.append(
+                question
+            )
+
+    random.shuffle(
+        selected
+    )
+
+    return selected
 
 
 # ============================================================
-# HOME PAGE
+# HOME
 # ============================================================
 
 @app.route("/")
@@ -358,7 +451,7 @@ def index():
 
 
 # ============================================================
-# HEALTH CHECK
+# HEALTH
 # ============================================================
 
 @app.route("/health")
@@ -366,545 +459,54 @@ def health():
 
     return jsonify({
         "status": "ok",
-        "questions_count": len(
-            questions_bank
-        )
+        "questions_count":
+            len(questions_bank)
     })
 
 
 # ============================================================
-# QUESTIONS TEST
-# ============================================================
-
-@app.route("/test-questions")
-def test_questions():
-
-    return jsonify({
-        "status": "ok",
-        "total_questions": len(
-            questions_bank
-        ),
-        "sample": questions_bank[:5]
-    })
-
-
-# ============================================================
-# BANK STATS
+# STATS
 # ============================================================
 
 @app.route("/api/stats")
-def api_stats():
+def stats():
 
     stages = {}
 
     for question in questions_bank:
 
-        stage = clean_value(
+        stage = clean(
             question.get("stage")
         )
 
-        if not stage:
-
-            stage = "unknown"
-
         stages[stage] = (
-            stages.get(stage, 0) + 1
+            stages.get(
+                stage,
+                0
+            )
+            + 1
         )
 
     return jsonify({
-        "status": "ok",
-        "total_questions": len(
-            questions_bank
-        ),
+        "ok": True,
+        "total_questions":
+            len(questions_bank),
         "stages": stages
     })
 
 
 # ============================================================
-# GET STAGES
-# ============================================================
-
-@app.route("/api/stages")
-def api_stages():
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        value = clean_value(
-            question.get("stage")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# GET GRADES
-# ============================================================
-
-@app.route("/api/grades")
-def api_grades():
-
-    stage = request.args.get(
-        "stage",
-        ""
-    )
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        if clean_value(
-            question.get("stage")
-        ) != clean_value(stage):
-
-            continue
-
-        value = clean_value(
-            question.get("grade")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# GET TERMS
-# ============================================================
-
-@app.route("/api/terms")
-def api_terms():
-
-    stage = request.args.get(
-        "stage",
-        ""
-    )
-
-    grade = request.args.get(
-        "grade",
-        ""
-    )
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        if clean_value(
-            question.get("stage")
-        ) != clean_value(stage):
-
-            continue
-
-        if clean_value(
-            question.get("grade")
-        ) != clean_value(grade):
-
-            continue
-
-        value = clean_value(
-            question.get("term")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# GET SUBJECTS
-# ============================================================
-
-@app.route("/api/subjects")
-def api_subjects():
-
-    stage = request.args.get(
-        "stage",
-        ""
-    )
-
-    grade = request.args.get(
-        "grade",
-        ""
-    )
-
-    term = request.args.get(
-        "term",
-        ""
-    )
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        if clean_value(
-            question.get("stage")
-        ) != clean_value(stage):
-
-            continue
-
-        if clean_value(
-            question.get("grade")
-        ) != clean_value(grade):
-
-            continue
-
-        if clean_value(
-            question.get("term")
-        ) != clean_value(term):
-
-            continue
-
-        value = clean_value(
-            question.get("subject")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# GET UNITS
-# ============================================================
-
-@app.route("/api/units")
-def api_units():
-
-    stage = request.args.get(
-        "stage",
-        ""
-    )
-
-    grade = request.args.get(
-        "grade",
-        ""
-    )
-
-    term = request.args.get(
-        "term",
-        ""
-    )
-
-    subject = request.args.get(
-        "subject",
-        ""
-    )
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        if clean_value(
-            question.get("stage")
-        ) != clean_value(stage):
-
-            continue
-
-        if clean_value(
-            question.get("grade")
-        ) != clean_value(grade):
-
-            continue
-
-        if clean_value(
-            question.get("term")
-        ) != clean_value(term):
-
-            continue
-
-        if clean_value(
-            question.get("subject")
-        ) != clean_value(subject):
-
-            continue
-
-        value = clean_value(
-            question.get("unit")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# GET LESSONS
-# ============================================================
-
-@app.route("/api/lessons")
-def api_lessons():
-
-    stage = request.args.get(
-        "stage",
-        ""
-    )
-
-    grade = request.args.get(
-        "grade",
-        ""
-    )
-
-    term = request.args.get(
-        "term",
-        ""
-    )
-
-    subject = request.args.get(
-        "subject",
-        ""
-    )
-
-    unit = request.args.get(
-        "unit",
-        ""
-    )
-
-    values = []
-
-    seen = set()
-
-    for question in questions_bank:
-
-        if clean_value(
-            question.get("stage")
-        ) != clean_value(stage):
-
-            continue
-
-        if clean_value(
-            question.get("grade")
-        ) != clean_value(grade):
-
-            continue
-
-        if clean_value(
-            question.get("term")
-        ) != clean_value(term):
-
-            continue
-
-        if clean_value(
-            question.get("subject")
-        ) != clean_value(subject):
-
-            continue
-
-        if unit:
-
-            if clean_value(
-                question.get("unit")
-            ) != clean_value(unit):
-
-                continue
-
-        value = clean_value(
-            question.get("lesson")
-        )
-
-        if (
-            value
-            and value not in seen
-        ):
-
-            seen.add(value)
-
-            values.append(value)
-
-    return jsonify(values)
-
-
-# ============================================================
-# PREVIEW QUESTIONS
+# GENERATE
+#
+# هذا هو المسار الذي يستخدمه index.html الحالي
 # ============================================================
 
 @app.route(
-    "/api/questions",
-    methods=[
-        "GET",
-        "POST"
-    ]
+    "/api/generate",
+    methods=["POST"]
 )
-def api_questions():
-
-    if request.method == "POST":
-
-        data = get_request_data()
-
-    else:
-
-        data = request.args
-
-    stage = get_first_value(
-        data,
-        ["stage"]
-    )
-
-    grade = get_first_value(
-        data,
-        ["grade"]
-    )
-
-    term = get_first_value(
-        data,
-        [
-            "term",
-            "semester"
-        ]
-    )
-
-    subject = get_first_value(
-        data,
-        ["subject"]
-    )
-
-    unit = get_first_value(
-        data,
-        ["unit"]
-    )
-
-    difficulty = get_first_value(
-        data,
-        ["difficulty"]
-    )
-
-    question_type = get_first_value(
-        data,
-        [
-            "type",
-            "question_type"
-        ]
-    )
-
-    lessons = []
-
-    if request.method == "GET":
-
-        lessons = request.args.getlist(
-            "lesson"
-        )
-
-        if not lessons:
-
-            lessons = request.args.getlist(
-                "lessons"
-            )
-
-    elif request.is_json:
-
-        lessons = data.get(
-            "lessons",
-            []
-        )
-
-        if isinstance(
-            lessons,
-            str
-        ):
-
-            lessons = [lessons]
-
-        if not lessons:
-
-            lesson = data.get(
-                "lesson"
-            )
-
-            if lesson:
-
-                lessons = [lesson]
-
-    else:
-
-        lessons = request.form.getlist(
-            "lessons"
-        )
-
-        if not lessons:
-
-            lessons = request.form.getlist(
-                "lesson"
-            )
-
-    results = get_questions(
-        stage=stage,
-        grade=grade,
-        term=term,
-        subject=subject,
-        unit=unit,
-        lessons=lessons,
-        question_type=question_type,
-        difficulty=difficulty
-    )
-
-    return jsonify({
-        "status": "ok",
-        "count": len(results),
-        "questions": results
-    })
-
-
-# ============================================================
-# GENERATE TEST
-# ============================================================
-
 @app.route(
     "/api/generate-test",
-    methods=["POST"]
-)
-@app.route(
-    "/generate-test",
-    methods=["POST"]
-)
-@app.route(
-    "/create-test",
     methods=["POST"]
 )
 @app.route(
@@ -912,332 +514,982 @@ def api_questions():
     methods=["POST"]
 )
 @app.route(
-    "/generate_exam",
+    "/generate-test",
     methods=["POST"]
 )
-@app.route(
-    "/create_exam",
-    methods=["POST"]
-)
-def generate_test():
+def generate():
 
-    data = get_request_data()
+    try:
 
-    stage = get_first_value(
-        data,
-        [
-            "stage",
-            "education_stage"
-        ]
-    )
+        data = request.get_json(
+            silent=True
+        ) or {}
 
-    grade = get_first_value(
-        data,
-        [
-            "grade",
-            "class",
-            "school_grade"
-        ]
-    )
+        stage = clean(
+            data.get("stage")
+        )
 
-    term = get_first_value(
-        data,
-        [
-            "term",
-            "semester"
-        ]
-    )
+        grade = clean(
+            data.get("grade")
+        )
 
-    subject = get_first_value(
-        data,
-        ["subject"]
-    )
+        track = clean(
+            data.get("track")
+        )
 
-    unit = get_first_value(
-        data,
-        ["unit"]
-    )
+        term = clean(
+            data.get("term")
+        )
 
-    lessons = []
-
-    if request.is_json:
+        subject = clean(
+            data.get("subject")
+        )
 
         lessons = data.get(
             "lessons",
             []
         )
 
-        if isinstance(
-            lessons,
-            str
-        ):
+        types = data.get(
+            "types",
+            []
+        )
 
-            lessons = [lessons]
+        difficulties = data.get(
+            "difficulties",
+            {}
+        )
+
+
+        # ====================================================
+        # VALIDATION
+        # ====================================================
+
+        if not stage:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر المرحلة التعليمية."
+            }), 400
+
+
+        if not grade:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر الصف."
+            }), 400
+
+
+        if not term:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر الفصل الدراسي."
+            }), 400
+
+
+        if not subject:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر المادة."
+            }), 400
+
 
         if not lessons:
 
-            lesson = data.get(
-                "lesson"
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر درساً واحداً على الأقل."
+            }), 400
+
+
+        if not types:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "اختر نوعاً واحداً على الأقل من الأسئلة."
+            }), 400
+
+
+        total_requested = sum(
+            int(
+                difficulties.get(
+                    difficulty,
+                    0
+                ) or 0
             )
-
-            if lesson:
-
-                lessons = [lesson]
-
-    else:
-
-        lessons = request.form.getlist(
-            "lessons"
+            for difficulty in [
+                "easy",
+                "medium",
+                "hard"
+            ]
         )
 
-        if not lessons:
 
-            lessons = request.form.getlist(
-                "lesson"
-            )
+        if total_requested <= 0:
 
-        if not lessons:
-
-            lesson = request.form.get(
-                "lesson"
-            )
-
-            if lesson:
-
-                lessons = [lesson]
-
-    mcq_count = safe_int(
-        get_first_value(
-            data,
-            [
-                "mcq_count",
-                "multiple_choice_count",
-                "choice_count"
-            ],
-            0
-        )
-    )
-
-    tf_count = safe_int(
-        get_first_value(
-            data,
-            [
-                "tf_count",
-                "true_false_count"
-            ],
-            0
-        )
-    )
-
-    fill_count = safe_int(
-        get_first_value(
-            data,
-            [
-                "fill_count",
-                "fill_blank_count"
-            ],
-            0
-        )
-    )
+            return jsonify({
+                "ok": False,
+                "error":
+                    "حدد عدد الأسئلة."
+            }), 400
 
 
-    # ========================================================
-    # DEFAULT COUNTS
-    # ========================================================
+        # ====================================================
+        # GENERATE
+        # ====================================================
 
-    if (
-        mcq_count == 0
-        and tf_count == 0
-        and fill_count == 0
-    ):
-
-        mcq_count = 5
-
-        tf_count = 5
-
-        fill_count = 5
-
-
-    # ========================================================
-    # VALIDATION
-    # ========================================================
-
-    if not stage:
-
-        return jsonify({
-            "status": "error",
-            "message": "يرجى اختيار المرحلة التعليمية"
-        }), 400
-
-
-    if not grade:
-
-        return jsonify({
-            "status": "error",
-            "message": "يرجى اختيار الصف"
-        }), 400
-
-
-    if not term:
-
-        return jsonify({
-            "status": "error",
-            "message": "يرجى اختيار الفصل الدراسي"
-        }), 400
-
-
-    if not subject:
-
-        return jsonify({
-            "status": "error",
-            "message": "يرجى اختيار المادة"
-        }), 400
-
-
-    selected_questions = []
-
-
-    # ========================================================
-    # MCQ
-    # ========================================================
-
-    if mcq_count > 0:
-
-        available = get_questions(
+        selected = select_questions(
             stage=stage,
             grade=grade,
             term=term,
             subject=subject,
-            unit=unit,
             lessons=lessons,
-            question_type="mcq"
-        )
-
-        random.shuffle(
-            available
-        )
-
-        selected_questions.extend(
-            available[:mcq_count]
+            types=types,
+            difficulties=difficulties,
+            track=track
         )
 
 
-    # ========================================================
-    # TRUE FALSE
-    # ========================================================
+        if not selected:
 
-    if tf_count > 0:
-
-        available = get_questions(
-            stage=stage,
-            grade=grade,
-            term=term,
-            subject=subject,
-            unit=unit,
-            lessons=lessons,
-            question_type="tf"
-        )
-
-        random.shuffle(
-            available
-        )
-
-        selected_questions.extend(
-            available[:tf_count]
-        )
+            return jsonify({
+                "ok": False,
+                "error":
+                    "لم يتم العثور على أسئلة مطابقة للاختيارات."
+            }), 404
 
 
-    # ========================================================
-    # FILL
-    # ========================================================
+        # ====================================================
+        # FORMAT FOR INDEX.HTML
+        # ====================================================
 
-    if fill_count > 0:
+        output = []
 
-        available = get_questions(
-            stage=stage,
-            grade=grade,
-            term=term,
-            subject=subject,
-            unit=unit,
-            lessons=lessons,
-            question_type="fill"
-        )
+        for question in selected:
 
-        random.shuffle(
-            available
-        )
-
-        selected_questions.extend(
-            available[:fill_count]
-        )
-
-
-    # ========================================================
-    # NO QUESTIONS FOUND
-    # ========================================================
-
-    if not selected_questions:
-
-        return jsonify({
-            "status": "error",
-            "message": "لم يتم العثور على أسئلة مطابقة للاختيارات المحددة",
-            "filters": {
-                "stage": stage,
-                "grade": grade,
-                "term": term,
-                "subject": subject,
-                "unit": unit,
-                "lessons": lessons
-            }
-        }), 404
-
-
-    random.shuffle(
-        selected_questions
-    )
-
-
-    return jsonify({
-        "status": "success",
-        "message": "تم إنشاء الاختبار بنجاح",
-        "count": len(
-            selected_questions
-        ),
-        "questions": selected_questions
-    })
-
-
-# ============================================================
-# QUESTION BY ID
-# ============================================================
-
-@app.route(
-    "/api/question/<question_id>"
-)
-def question_by_id(
-    question_id
-):
-
-    for question in questions_bank:
-
-        if str(
-            question.get("id")
-        ) == str(
-            question_id
-        ):
-
-            return jsonify(
+            item = dict(
                 question
             )
 
-    return jsonify({
-        "status": "error",
-        "message": "السؤال غير موجود"
-    }), 404
+            item["typeKey"] = (
+                question.get("type")
+            )
+
+            output.append(
+                item
+            )
+
+
+        return jsonify({
+            "ok": True,
+            "status": "success",
+            "count": len(output),
+            "requested":
+                total_requested,
+            "questions":
+                output
+        })
+
+
+    except Exception as error:
+
+        print(
+            "Generate error:",
+            error
+        )
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "حدث خطأ أثناء إنشاء الاختبار."
+        }), 500
 
 
 # ============================================================
-# SHOW ROUTES
+# PDF HELPERS
+# ============================================================
+
+def find_pdf_font():
+
+    candidates = [
+
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+
+        "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
+
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+    ]
+
+    for path in candidates:
+
+        if os.path.exists(path):
+
+            return path
+
+    return None
+
+
+PDF_FONT_NAME = "Helvetica"
+
+font_path = find_pdf_font()
+
+if font_path:
+
+    try:
+
+        pdfmetrics.registerFont(
+            TTFont(
+                "ArabicFont",
+                font_path
+            )
+        )
+
+        PDF_FONT_NAME = (
+            "ArabicFont"
+        )
+
+    except Exception as error:
+
+        print(
+            "Font registration error:",
+            error
+        )
+
+
+# ============================================================
+# ARABIC PDF TEXT
+# ============================================================
+
+def pdf_text(value):
+
+    text = clean(value)
+
+    try:
+
+        import arabic_reshaper
+
+        from bidi.algorithm import (
+            get_display
+        )
+
+        return get_display(
+            arabic_reshaper.reshape(
+                text
+            )
+        )
+
+    except Exception:
+
+        return text
+
+
+# ============================================================
+# CREATE DOCX
+# ============================================================
+
+def create_docx(
+    questions,
+    meta
+):
+
+    document = Document()
+
+    section = document.sections[0]
+
+    section.top_margin = (
+        section.top_margin
+    )
+
+
+    title = document.add_paragraph()
+
+    title.alignment = (
+        WD_ALIGN_PARAGRAPH.CENTER
+    )
+
+    title_run = title.add_run(
+        clean(
+            meta.get("title")
+        )
+        or "اختبار"
+    )
+
+    title_run.bold = True
+
+
+    info = document.add_paragraph()
+
+    info.alignment = (
+        WD_ALIGN_PARAGRAPH.RIGHT
+    )
+
+    info.add_run(
+        "المادة: "
+        + clean(
+            meta.get("subject")
+        )
+        + " | الصف: "
+        + clean(
+            meta.get("grade")
+        )
+        + " | الفصل: "
+        + clean(
+            meta.get("term")
+        )
+    )
+
+
+    teacher = document.add_paragraph()
+
+    teacher.alignment = (
+        WD_ALIGN_PARAGRAPH.RIGHT
+    )
+
+    teacher.add_run(
+        "المعلم/ـة: "
+        + (
+            clean(
+                meta.get("teacher")
+            )
+            or "________________"
+        )
+    )
+
+
+    school = document.add_paragraph()
+
+    school.alignment = (
+        WD_ALIGN_PARAGRAPH.RIGHT
+    )
+
+    school.add_run(
+        "المدرسة: "
+        + (
+            clean(
+                meta.get("school")
+            )
+            or "________________"
+        )
+    )
+
+
+    document.add_paragraph(
+        "اسم الطالب/ـة: ______________________________"
+    )
+
+
+    type_titles = {
+
+        "mcq":
+            "اختر الإجابة الصحيحة:",
+
+        "tf":
+            "ضع علامة صح أو خطأ:",
+
+        "fill":
+            "أكمل الفراغ باختيار الإجابة المناسبة:"
+    }
+
+
+    question_number = 0
+
+    for type_key in [
+        "mcq",
+        "tf",
+        "fill"
+    ]:
+
+        items = [
+            q
+            for q in questions
+            if clean(
+                q.get("typeKey")
+                or q.get("type")
+            ) == type_key
+        ]
+
+        if not items:
+
+            continue
+
+
+        heading = document.add_paragraph()
+
+        heading.alignment = (
+            WD_ALIGN_PARAGRAPH.RIGHT
+        )
+
+        run = heading.add_run(
+            type_titles[
+                type_key
+            ]
+        )
+
+        run.bold = True
+
+
+        for question in items:
+
+            question_number += 1
+
+            paragraph = (
+                document.add_paragraph()
+            )
+
+            paragraph.alignment = (
+                WD_ALIGN_PARAGRAPH.RIGHT
+            )
+
+            paragraph.add_run(
+                f"{question_number}. "
+                + clean(
+                    question.get("text")
+                )
+            )
+
+
+            options = (
+                question.get(
+                    "options"
+                )
+                or []
+            )
+
+            if type_key in [
+                "mcq",
+                "fill"
+            ]:
+
+                for index, option in enumerate(
+                    options,
+                    1
+                ):
+
+                    option_paragraph = (
+                        document.add_paragraph()
+                    )
+
+                    option_paragraph.alignment = (
+                        WD_ALIGN_PARAGRAPH.RIGHT
+                    )
+
+                    option_paragraph.add_run(
+                        f"{index}) "
+                        + clean(option)
+                    )
+
+
+            elif type_key == "tf":
+
+                answer_line = (
+                    document.add_paragraph()
+                )
+
+                answer_line.alignment = (
+                    WD_ALIGN_PARAGRAPH.RIGHT
+                )
+
+                answer_line.add_run(
+                    "(        )"
+                )
+
+
+    output = io.BytesIO()
+
+    document.save(
+        output
+    )
+
+    output.seek(0)
+
+    return output
+
+
+# ============================================================
+# CREATE PDF
+# ============================================================
+
+def create_pdf(
+    questions,
+    meta
+):
+
+    output = io.BytesIO()
+
+    pdf = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=35,
+        leftMargin=35,
+        topMargin=35,
+        bottomMargin=35
+    )
+
+
+    styles = (
+        getSampleStyleSheet()
+    )
+
+
+    title_style = (
+        ParagraphStyle(
+            "ArabicTitle",
+            parent=styles[
+                "Heading1"
+            ],
+            fontName=
+                PDF_FONT_NAME,
+            alignment=
+                TA_CENTER,
+            fontSize=18,
+            leading=25
+        )
+    )
+
+
+    normal_style = (
+        ParagraphStyle(
+            "ArabicNormal",
+            parent=styles[
+                "Normal"
+            ],
+            fontName=
+                PDF_FONT_NAME,
+            alignment=
+                TA_RIGHT,
+            fontSize=11,
+            leading=18
+        )
+    )
+
+
+    heading_style = (
+        ParagraphStyle(
+            "ArabicHeading",
+            parent=styles[
+                "Heading2"
+            ],
+            fontName=
+                PDF_FONT_NAME,
+            alignment=
+                TA_RIGHT,
+            fontSize=13,
+            leading=20
+        )
+    )
+
+
+    story = []
+
+
+    story.append(
+        Paragraph(
+            pdf_text(
+                meta.get("title")
+                or "اختبار"
+            ),
+            title_style
+        )
+    )
+
+
+    story.append(
+        Spacer(
+            1,
+            12
+        )
+    )
+
+
+    info = (
+        "المادة: "
+        + clean(
+            meta.get("subject")
+        )
+        + " | الصف: "
+        + clean(
+            meta.get("grade")
+        )
+        + " | الفصل: "
+        + clean(
+            meta.get("term")
+        )
+    )
+
+
+    story.append(
+        Paragraph(
+            pdf_text(info),
+            normal_style
+        )
+    )
+
+
+    story.append(
+        Paragraph(
+            pdf_text(
+                "المعلم/ـة: "
+                + (
+                    clean(
+                        meta.get(
+                            "teacher"
+                        )
+                    )
+                    or "________________"
+                )
+            ),
+            normal_style
+        )
+    )
+
+
+    story.append(
+        Paragraph(
+            pdf_text(
+                "المدرسة: "
+                + (
+                    clean(
+                        meta.get(
+                            "school"
+                        )
+                    )
+                    or "________________"
+                )
+            ),
+            normal_style
+        )
+    )
+
+
+    story.append(
+        Paragraph(
+            pdf_text(
+                "اسم الطالب/ـة: ______________________________"
+            ),
+            normal_style
+        )
+    )
+
+
+    story.append(
+        Spacer(
+            1,
+            14
+        )
+    )
+
+
+    titles = {
+
+        "mcq":
+            "اختر الإجابة الصحيحة:",
+
+        "tf":
+            "ضع علامة صح أو خطأ:",
+
+        "fill":
+            "أكمل الفراغ باختيار الإجابة المناسبة:"
+    }
+
+
+    counter = 0
+
+
+    for type_key in [
+        "mcq",
+        "tf",
+        "fill"
+    ]:
+
+        items = [
+            q
+            for q in questions
+            if clean(
+                q.get("typeKey")
+                or q.get("type")
+            ) == type_key
+        ]
+
+
+        if not items:
+
+            continue
+
+
+        story.append(
+            Paragraph(
+                pdf_text(
+                    titles[
+                        type_key
+                    ]
+                ),
+                heading_style
+            )
+        )
+
+
+        story.append(
+            Spacer(
+                1,
+                6
+            )
+        )
+
+
+        for question in items:
+
+            counter += 1
+
+            question_text = (
+                f"{counter}. "
+                + clean(
+                    question.get(
+                        "text"
+                    )
+                )
+            )
+
+
+            story.append(
+                Paragraph(
+                    pdf_text(
+                        question_text
+                    ),
+                    normal_style
+                )
+            )
+
+
+            options = (
+                question.get(
+                    "options"
+                )
+                or []
+            )
+
+
+            if type_key in [
+                "mcq",
+                "fill"
+            ]:
+
+                for index, option in enumerate(
+                    options,
+                    1
+                ):
+
+                    story.append(
+                        Paragraph(
+                            pdf_text(
+                                f"{index}) "
+                                + clean(option)
+                            ),
+                            normal_style
+                        )
+                    )
+
+
+            elif type_key == "tf":
+
+                story.append(
+                    Paragraph(
+                        "(        )",
+                        normal_style
+                    )
+                )
+
+
+            story.append(
+                Spacer(
+                    1,
+                    9
+                )
+            )
+
+
+    pdf.build(
+        story
+    )
+
+    output.seek(0)
+
+    return output
+
+
+# ============================================================
+# EXPORT
+#
+# index.html uses /api/export
+# ============================================================
+
+@app.route(
+    "/api/export",
+    methods=["POST"]
+)
+def export_document():
+
+    try:
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+
+        questions = data.get(
+            "questions",
+            []
+        )
+
+
+        meta = data.get(
+            "meta",
+            {}
+        )
+
+
+        export_format = clean(
+            data.get("format")
+        ).lower()
+
+
+        if not questions:
+
+            return jsonify({
+                "ok": False,
+                "error":
+                    "لا توجد أسئلة للتصدير."
+            }), 400
+
+
+        # ====================================================
+        # WORD
+        # ====================================================
+
+        if export_format == "docx":
+
+            file_data = create_docx(
+                questions,
+                meta
+            )
+
+            return send_file(
+                file_data,
+                as_attachment=True,
+                download_name=
+                    "exam.docx",
+                mimetype=(
+                    "application/"
+                    "vnd.openxmlformats-"
+                    "officedocument."
+                    "wordprocessingml."
+                    "document"
+                )
+            )
+
+
+        # ====================================================
+        # PDF
+        # ====================================================
+
+        if export_format == "pdf":
+
+            file_data = create_pdf(
+                questions,
+                meta
+            )
+
+            return send_file(
+                file_data,
+                as_attachment=True,
+                download_name=
+                    "exam.pdf",
+                mimetype=
+                    "application/pdf"
+            )
+
+
+        # ====================================================
+        # BOTH
+        # ====================================================
+
+        if export_format == "both":
+
+            pdf_file = create_pdf(
+                questions,
+                meta
+            )
+
+            docx_file = create_docx(
+                questions,
+                meta
+            )
+
+
+            zip_buffer = io.BytesIO()
+
+
+            with zipfile.ZipFile(
+                zip_buffer,
+                "w",
+                zipfile.ZIP_DEFLATED
+            ) as archive:
+
+                archive.writestr(
+                    "exam.pdf",
+                    pdf_file.getvalue()
+                )
+
+                archive.writestr(
+                    "exam.docx",
+                    docx_file.getvalue()
+                )
+
+
+            zip_buffer.seek(0)
+
+
+            return send_file(
+                zip_buffer,
+                as_attachment=True,
+                download_name=
+                    "exam_files.zip",
+                mimetype=
+                    "application/zip"
+            )
+
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "صيغة التصدير غير صحيحة."
+        }), 400
+
+
+    except Exception as error:
+
+        print(
+            "Export error:",
+            error
+        )
+
+        return jsonify({
+            "ok": False,
+            "error":
+                "حدث خطأ أثناء التصدير."
+        }), 500
+
+
+# ============================================================
+# ROUTES
 # ============================================================
 
 @app.route("/routes")
@@ -1248,12 +1500,15 @@ def routes():
     for rule in app.url_map.iter_rules():
 
         result.append({
-            "route": str(rule),
-            "methods": sorted(
-                list(
-                    rule.methods
+            "route":
+                str(rule),
+
+            "methods":
+                sorted(
+                    list(
+                        rule.methods
+                    )
                 )
-            )
         })
 
     return jsonify(
@@ -1266,13 +1521,12 @@ def routes():
 # ============================================================
 
 @app.errorhandler(404)
-def not_found(
-    error
-):
+def not_found(error):
 
     return jsonify({
-        "status": "error",
-        "message": "الصفحة غير موجودة"
+        "ok": False,
+        "error":
+            "الصفحة غير موجودة."
     }), 404
 
 
@@ -1281,23 +1535,22 @@ def not_found(
 # ============================================================
 
 @app.errorhandler(500)
-def server_error(
-    error
-):
+def server_error(error):
 
     print(
-        "Internal server error:",
+        "Server error:",
         error
     )
 
     return jsonify({
-        "status": "error",
-        "message": "حدث خطأ داخلي في الخادم"
+        "ok": False,
+        "error":
+            "حدث خطأ داخلي في الخادم."
     }), 500
 
 
 # ============================================================
-# RUN APP
+# RUN
 # ============================================================
 
 if __name__ == "__main__":
